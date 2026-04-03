@@ -242,10 +242,54 @@ class ContractContract(models.Model):
         "contract_id",
         string="Gesendete Erinnerungen",
     )
+    approval_log_ids = fields.One2many(
+        "contract.approval.log",
+        "contract_id",
+        string="Freigabeprotokoll",
+    )
     timeline_ids = fields.One2many(
         "contract.timeline",
         "contract_id",
         string="Timeline",
+    )
+    cost_center_budget_id = fields.Many2one(
+        "contract.cost.center.budget",
+        string="Kostenstellenbudget",
+        compute="_compute_cost_center_budget_info",
+    )
+    cost_center_budget_currency_id = fields.Many2one(
+        "res.currency",
+        string="Budgetwaehrung",
+        compute="_compute_cost_center_budget_info",
+    )
+    cost_center_monthly_budget = fields.Monetary(
+        string="Budget monatlich",
+        currency_field="cost_center_budget_currency_id",
+        compute="_compute_cost_center_budget_info",
+    )
+    cost_center_annual_budget = fields.Monetary(
+        string="Budget jaehrlich",
+        currency_field="cost_center_budget_currency_id",
+        compute="_compute_cost_center_budget_info",
+    )
+    cost_center_committed_monthly = fields.Monetary(
+        string="Ist monatlich",
+        currency_field="cost_center_budget_currency_id",
+        compute="_compute_cost_center_budget_info",
+    )
+    cost_center_committed_annual = fields.Monetary(
+        string="Ist jaehrlich",
+        currency_field="cost_center_budget_currency_id",
+        compute="_compute_cost_center_budget_info",
+    )
+    cost_center_budget_state = fields.Selection(
+        [
+            ("green", "Im Budget"),
+            ("yellow", "Beobachten"),
+            ("red", "Ueber Budget"),
+        ],
+        string="Budgetstatus",
+        compute="_compute_cost_center_budget_info",
     )
 
     @api.model_create_multi
@@ -353,8 +397,84 @@ class ContractContract(models.Model):
                     errors.append("Die Vorlage verlangt einen Vertragswert.")
                 if rec.template_id.require_payment_interval and not rec.payment_interval:
                     errors.append("Die Vorlage verlangt ein Zahlungsintervall.")
+                if rec.template_id.lock_type_id and rec.type_id != rec.template_id.type_id:
+                    errors.append("Der Vertragstyp ist durch die Vorlage fest vorgegeben.")
+                if rec.template_id.lock_category_id and rec.category_id != rec.template_id.category_id:
+                    errors.append("Die Kategorie ist durch die Vorlage fest vorgegeben.")
+                if rec.template_id.lock_department_id and rec.department_id != rec.template_id.department_id:
+                    errors.append("Die Abteilung ist durch die Vorlage fest vorgegeben.")
+                if rec.template_id.lock_responsible_user and rec.responsible_user_id != rec.template_id.responsible_user_id:
+                    errors.append("Die Verantwortung ist durch die Vorlage fest vorgegeben.")
+                if rec.template_id.lock_approval_chain and (
+                    rec.approval_user_id != rec.template_id.approval_user_id
+                    or rec.manager_approval_user_id != rec.template_id.manager_approval_user_id
+                ):
+                    errors.append("Die Freigabekette ist durch die Vorlage fest vorgegeben.")
+                if rec.template_id.lock_cost_center and (rec.cost_center or False) != (rec.template_id.cost_center or False):
+                    errors.append("Die Kostenstelle ist durch die Vorlage fest vorgegeben.")
+                if rec.template_id.lock_finance_terms and (
+                    rec.contract_value != rec.template_id.contract_value
+                    or rec.currency_id != rec.template_id.currency_id
+                    or rec.payment_interval != rec.template_id.payment_interval
+                ):
+                    errors.append("Die finanziellen Konditionen sind durch die Vorlage fest vorgegeben.")
+                if rec.template_id.lock_reminder_rules and set(rec.reminder_rule_ids.ids) != set(rec.template_id.reminder_rule_ids.ids):
+                    errors.append("Die Erinnerungskonfiguration ist durch die Vorlage fest vorgegeben.")
             if errors:
                 raise ValidationError("\n".join(errors))
+
+    def _get_matching_cost_center_budget(self):
+        self.ensure_one()
+        if not self.cost_center:
+            return self.env["contract.cost.center.budget"]
+        budget_model = self.env["contract.cost.center.budget"]
+        if self.department_id:
+            budget = budget_model.search(
+                [
+                    ("code", "=ilike", self.cost_center),
+                    ("department_id", "=", self.department_id.id),
+                    ("active", "=", True),
+                ],
+                limit=1,
+            )
+            if budget:
+                return budget
+        return budget_model.search(
+            [
+                ("code", "=ilike", self.cost_center),
+                ("department_id", "=", False),
+                ("active", "=", True),
+            ],
+            limit=1,
+        )
+
+    @api.depends("cost_center", "department_id", "normalized_monthly_value", "normalized_annual_value")
+    def _compute_cost_center_budget_info(self):
+        empty_budget = self.env["contract.cost.center.budget"]
+        for rec in self:
+            budget = rec._get_matching_cost_center_budget() if rec.cost_center else empty_budget
+            rec.cost_center_budget_id = budget
+            rec.cost_center_budget_currency_id = budget.currency_id if budget else False
+            rec.cost_center_monthly_budget = budget.monthly_budget if budget else 0.0
+            rec.cost_center_annual_budget = budget.annual_budget if budget else 0.0
+            rec.cost_center_committed_monthly = budget.committed_monthly_value if budget else 0.0
+            rec.cost_center_committed_annual = budget.committed_annual_value if budget else 0.0
+            rec.cost_center_budget_state = budget.budget_state if budget else False
+
+    def _create_approval_log(self, stage, decision, assigned_user=None, comment=False):
+        log_model = self.env["contract.approval.log"].sudo()
+        for rec in self:
+            log_model.create(
+                {
+                    "contract_id": rec.id,
+                    "stage": stage,
+                    "decision": decision,
+                    "actor_user_id": self.env.user.id,
+                    "assigned_user_id": assigned_user.id if assigned_user else False,
+                    "decision_comment": comment or False,
+                    "approval_state_after": rec.approval_state,
+                }
+            )
 
     def _apply_template_package(self, template):
         self.ensure_one()
@@ -637,6 +757,8 @@ class ContractContract(models.Model):
                     if contract.manager_approval_user_id
                     else "Manager"
                 )
+                stage = "manager"
+                assigned_user = contract.manager_approval_user_id
             else:
                 contract._send_mail_template("contract_management.mail_template_contract_escalation_approver")
                 approver_name = (
@@ -644,6 +766,14 @@ class ContractContract(models.Model):
                     if contract.approval_user_id
                     else "Freigeber"
                 )
+                stage = "approval"
+                assigned_user = contract.approval_user_id
+            contract._create_approval_log(
+                stage=stage,
+                decision="escalated",
+                assigned_user=assigned_user,
+                comment=f"Freigabe eskaliert an {approver_name}",
+            )
             self.env["contract.timeline"].sudo().create(
                 {
                     "contract_id": contract.id,
@@ -682,6 +812,12 @@ class ContractContract(models.Model):
             )
             rec._create_approval_activity()
             rec._send_mail_template("contract_management.mail_template_contract_submitted")
+            rec._create_approval_log(
+                stage="approval",
+                decision="submitted",
+                assigned_user=rec.approval_user_id,
+                comment="Vertrag zur Freigabe eingereicht.",
+            )
             rec.message_post(
                 body=f"Vertrag zur Freigabe eingereicht an {rec.approval_user_id.display_name}."
             )
@@ -734,6 +870,7 @@ class ContractContract(models.Model):
                 raise UserError("Nur Vertraege im Status 'Zur Freigabe' koennen bearbeitet werden.")
             rec._check_can_approve()
             clean_comment = (comment or "").strip()
+            current_stage = "manager" if rec.approval_state == "pending_manager" else "approval"
             if decision == "reject" and not clean_comment:
                 raise UserError("Bei einer Ablehnung ist ein Kommentar verpflichtend.")
             values = {}
@@ -758,6 +895,18 @@ class ContractContract(models.Model):
                     rec._close_approval_activities(feedback=feedback)
                     rec._create_approval_activity(stage="manager")
                     rec._send_mail_template("contract_management.mail_template_contract_manager_stage")
+                    rec._create_approval_log(
+                        stage=current_stage,
+                        decision="approved",
+                        assigned_user=self.env.user,
+                        comment=clean_comment or "Vorpruefung abgeschlossen.",
+                    )
+                    rec._create_approval_log(
+                        stage="manager",
+                        decision="submitted",
+                        assigned_user=rec.manager_approval_user_id,
+                        comment="An Manager-Freigabe weitergeleitet.",
+                    )
                 else:
                     values.update(
                         {
@@ -787,6 +936,12 @@ class ContractContract(models.Model):
                     rec.write(values)
                     rec._close_approval_activities(feedback=feedback)
                     rec._send_mail_template("contract_management.mail_template_contract_approved")
+                    rec._create_approval_log(
+                        stage=current_stage,
+                        decision="approved",
+                        assigned_user=self.env.user,
+                        comment=clean_comment or "Vertrag freigegeben.",
+                    )
             elif decision == "reject":
                 values.update(
                     {
@@ -815,6 +970,12 @@ class ContractContract(models.Model):
                 rec.write(values)
                 rec._close_approval_activities(feedback=feedback)
                 rec._send_mail_template("contract_management.mail_template_contract_rejected")
+                rec._create_approval_log(
+                    stage=current_stage,
+                    decision="rejected",
+                    assigned_user=self.env.user,
+                    comment=clean_comment,
+                )
             else:
                 raise UserError("Unbekannte Freigabeentscheidung.")
             rec.message_post(body=message)

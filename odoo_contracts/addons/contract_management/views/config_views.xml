@@ -59,6 +59,12 @@
             <form string="Vertragsvorlage">
                 <header>
                     <button
+                        name="action_apply_contract_kind_profile"
+                        type="object"
+                        string="Profil aus Vertragsart anwenden"
+                        class="btn-secondary"
+                    />
+                    <button
                         name="action_approve_template"
                         type="object"
                         string="Freigeben"
@@ -129,6 +135,20 @@
                             <field name="require_value"/>
                             <field name="require_payment_interval"/>
                             <field name="rejection_reason" readonly="1" invisible="not rejection_reason"/>
+                        </group>
+                    </group>
+                    <group col="2" string="Gesperrte Feldkombinationen">
+                        <group>
+                            <field name="lock_type_id"/>
+                            <field name="lock_category_id"/>
+                            <field name="lock_department_id"/>
+                            <field name="lock_responsible_user"/>
+                        </group>
+                        <group>
+                            <field name="lock_approval_chain"/>
+                            <field name="lock_cost_center"/>
+                            <field name="lock_finance_terms"/>
+                            <field name="lock_reminder_rules"/>
                         </group>
                     </group>
                     <group col="1" string="Standardklauseln">

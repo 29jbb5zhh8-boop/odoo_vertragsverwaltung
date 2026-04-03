@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_contract_cost_center_budget_tree" model="ir.ui.view">
+        <field name="name">contract.cost.center.budget.tree</field>
+        <field name="model">contract.cost.center.budget</field>
+        <field name="arch" type="xml">
+            <list string="Kostenstellenbudgets">
+                <field name="name"/>
+                <field name="code"/>
+                <field name="department_id"/>
+                <field name="monthly_budget"/>
+                <field name="committed_monthly_value"/>
+                <field name="annual_budget"/>
+                <field name="committed_annual_value"/>
+                <field name="budget_state" widget="badge"/>
+                <field name="contract_count"/>
+                <field name="active"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_contract_cost_center_budget_form" model="ir.ui.view">
+        <field name="name">contract.cost.center.budget.form</field>
+        <field name="model">contract.cost.center.budget</field>
+        <field name="arch" type="xml">
+            <form string="Kostenstellenbudget">
+                <sheet>
+                    <group col="2">
+                        <group>
+                            <field name="name"/>
+                            <field name="code"/>
+                            <field name="department_id"/>
+                            <field name="currency_id"/>
+                            <field name="active"/>
+                        </group>
+                        <group>
+                            <field name="monthly_budget"/>
+                            <field name="committed_monthly_value" readonly="1"/>
+                            <field name="monthly_variance" readonly="1"/>
+                            <field name="budget_state" widget="badge" readonly="1"/>
+                            <field name="contract_count" readonly="1"/>
+                        </group>
+                    </group>
+                    <group col="2">
+                        <group>
+                            <field name="annual_budget"/>
+                            <field name="committed_annual_value" readonly="1"/>
+                            <field name="annual_variance" readonly="1"/>
+                        </group>
+                        <group>
+                            <field name="note"/>
+                        </group>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_contract_cost_center_budget_search" model="ir.ui.view">
+        <field name="name">contract.cost.center.budget.search</field>
+        <field name="model">contract.cost.center.budget</field>
+        <field name="arch" type="xml">
+            <search string="Kostenstellenbudgets">
+                <field name="name"/>
+                <field name="code"/>
+                <field name="department_id"/>
+                <filter name="budget_overrun" string="Ueber Budget" domain="[('budget_state', '=', 'red')]"/>
+                <filter name="budget_warning" string="Beobachten" domain="[('budget_state', '=', 'yellow')]"/>
+                <filter name="group_department" string="Nach Abteilung" context="{'group_by': 'department_id'}"/>
+                <filter name="group_cost_center" string="Nach Kostenstelle" context="{'group_by': 'code'}"/>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_contract_cost_center_budget" model="ir.actions.act_window">
+        <field name="name">Kostenstellenbudgets</field>
+        <field name="res_model">contract.cost.center.budget</field>
+        <field name="view_mode">list,form</field>
+        <field name="search_view_id" ref="view_contract_cost_center_budget_search"/>
+        <field name="context">
+            {
+                'search_default_budget_overrun': 1
+            }
+        </field>
+    </record>
+</odoo>
