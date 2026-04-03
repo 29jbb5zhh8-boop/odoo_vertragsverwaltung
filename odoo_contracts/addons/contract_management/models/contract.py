@@ -223,6 +223,19 @@ class ContractContract(models.Model):
             parts = [note_text] + [t for t in attach_texts if t]
             rec.fulltext = "\n".join(parts).strip()
 
+    @api.depends("attachment_ids.ocr_text", "attachment_ids.show_in_contract", "attachment_ids.is_current")
+    def _compute_ocr_text_combined(self):
+        for rec in self:
+            visible_attachments = rec.attachment_ids.filtered(
+                lambda a: a.show_in_contract and a.ocr_text
+            )
+            if not visible_attachments:
+                visible_attachments = rec.attachment_ids.filtered(
+                    lambda a: a.is_current and a.ocr_text
+                )
+            texts = visible_attachments.mapped("ocr_text")
+            rec.ocr_text_combined = "\n\n".join([text for text in texts if text]).strip()
+
 
     def action_activate(self):
         self.write({"state": "active"})
@@ -493,13 +506,24 @@ class ContractContract(models.Model):
         )
         for rec in to_renew:
             if rec.renewal_period_months and rec.renewal_period_months > 0:
-                rec.end_date = fields.Date.add(rec.end_date, months=rec.renewal_period_months)
+                new_end_date = rec.end_date
+                while new_end_date and new_end_date < today:
+                    new_end_date = fields.Date.add(
+                        new_end_date, months=rec.renewal_period_months
+                    )
+                if not new_end_date:
+                    continue
+                previous_end_date = rec.end_date
+                rec.end_date = new_end_date
                 rec.state = "active"
                 self.env["contract.timeline"].sudo().create(
                     {
                         "contract_id": rec.id,
                         "event_type": "renew",
-                        "message": "Vertrag automatisch verlängert",
+                        "message": (
+                            "Vertrag automatisch verlaengert: "
+                            f"{previous_end_date} -> {new_end_date}"
+                        ),
                         "user_id": self.env.user.id,
                     }
                 )

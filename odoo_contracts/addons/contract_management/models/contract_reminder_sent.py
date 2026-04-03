@@ -6,6 +6,13 @@ class ContractReminderSent(models.Model):
     _name = "contract.reminder.sent"
     _description = "Contract Reminder Sent"
     _order = "reminder_date desc"
+    _sql_constraints = [
+        (
+            "contract_rule_date_unique",
+            "unique(contract_id, rule_id, reminder_date)",
+            "Diese Erinnerung wurde fuer den Vertrag bereits angelegt.",
+        )
+    ]
 
     contract_id = fields.Many2one(
         "contract.contract",
