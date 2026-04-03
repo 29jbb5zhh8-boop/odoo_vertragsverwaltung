@@ -11,6 +11,8 @@
                 <field name="contract_kind" optional="show"/>
                 <field name="partner_id" optional="show"/>
                 <field name="contract_value" optional="show"/>
+                <field name="normalized_monthly_value" optional="show"/>
+                <field name="normalized_annual_value" optional="show"/>
                 <field name="currency_id" optional="hide"/>
                 <field name="payment_interval" optional="show"/>
                 <field name="cost_center" optional="show"/>
@@ -45,6 +47,8 @@
                 <field name="partner_id"/>
                 <field name="contract_kind"/>
                 <field name="contract_value"/>
+                <field name="normalized_monthly_value"/>
+                <field name="normalized_annual_value"/>
                 <field name="currency_id"/>
                 <field name="end_date"/>
                 <field name="approval_state"/>
@@ -77,6 +81,10 @@
                                 <div>
                                     <strong>Wert:</strong>
                                     <field name="contract_value"/>
+                                </div>
+                                <div>
+                                    <strong>Monat:</strong>
+                                    <field name="normalized_monthly_value"/>
                                 </div>
                                 <div>
                                     <strong>Ende:</strong>
@@ -116,6 +124,8 @@
                 <field name="payment_interval" type="col"/>
                 <field name="department_id" type="row"/>
                 <field name="contract_value" type="measure"/>
+                <field name="normalized_monthly_value" type="measure"/>
+                <field name="normalized_annual_value" type="measure"/>
             </pivot>
         </field>
     </record>
@@ -126,7 +136,7 @@
         <field name="arch" type="xml">
             <graph string="Vertragsvolumen" type="bar">
                 <field name="contract_kind"/>
-                <field name="contract_value" type="measure"/>
+                <field name="normalized_annual_value" type="measure"/>
             </graph>
         </field>
     </record>
@@ -271,6 +281,14 @@
                                 <field name="contract_value" nolabel="1"/>
                             </div>
                             <div class="cm-contract-summary-item">
+                                <span class="cm-contract-summary-label">Monatswert</span>
+                                <field name="normalized_monthly_value" nolabel="1"/>
+                            </div>
+                            <div class="cm-contract-summary-item">
+                                <span class="cm-contract-summary-label">Jahreswert</span>
+                                <field name="normalized_annual_value" nolabel="1"/>
+                            </div>
+                            <div class="cm-contract-summary-item">
                                 <span class="cm-contract-summary-label">Manager-Pruefung</span>
                                 <field name="requires_manager_approval" nolabel="1"/>
                             </div>
@@ -324,6 +342,8 @@
                                     <group col="2">
                                         <group>
                                             <field name="contract_value" string="Vertragswert"/>
+                                            <field name="normalized_monthly_value" string="Monatswert" readonly="1"/>
+                                            <field name="normalized_annual_value" string="Jahreswert" readonly="1"/>
                                             <field name="currency_id" string="Waehrung"/>
                                         </group>
                                         <group>
@@ -377,6 +397,8 @@
                                     <div class="cm-contract-card-title">Finanzen</div>
                                     <group col="1">
                                         <field name="contract_value" string="Vertragswert"/>
+                                        <field name="normalized_monthly_value" string="Monatswert" readonly="1"/>
+                                        <field name="normalized_annual_value" string="Jahreswert" readonly="1"/>
                                         <field name="currency_id" string="Waehrung"/>
                                         <field name="payment_interval" string="Zahlungsintervall"/>
                                         <field name="cost_center" string="Kostenstelle"/>
@@ -489,6 +511,8 @@
                 <field name="contract_kind"/>
                 <field name="partner_id"/>
                 <field name="contract_value"/>
+                <field name="normalized_monthly_value"/>
+                <field name="normalized_annual_value"/>
                 <field name="currency_id"/>
                 <field name="payment_interval"/>
                 <field name="cost_center"/>
@@ -518,12 +542,15 @@
                 <filter name="financial_active" string="Aktive Kosten" domain="[('state', 'in', ['active', 'expiring']), ('contract_value', '&gt;', 0)]"/>
                 <filter name="recurring_costs" string="Wiederkehrende Kosten" domain="[('contract_value', '&gt;', 0), ('payment_interval', '!=', 'one_time')]"/>
                 <filter name="high_commitments" string="Hohe Verpflichtungen" domain="[('contract_kind', '!=', 'customer'), ('contract_value', '&gt;=', 10000)]"/>
+                <filter name="high_monthly_burn" string="Hoher Monatswert" domain="[('normalized_monthly_value', '&gt;=', 1000)]"/>
+                <filter name="high_annual_burn" string="Hoher Jahreswert" domain="[('normalized_annual_value', '&gt;=', 12000)]"/>
                 <filter name="customer_contracts" string="Kundenverträge" domain="[('contract_kind', '=', 'customer')]"/>
                 <filter name="supplier_contracts" string="Lieferantenverträge" domain="[('contract_kind', '=', 'supplier')]"/>
                 <separator/>
                 <filter name="group_contract_kind" string="Nach Vertragsart" context="{'group_by': 'contract_kind'}"/>
                 <filter name="group_payment_interval" string="Nach Zahlungsintervall" context="{'group_by': 'payment_interval'}"/>
                 <filter name="group_cost_center" string="Nach Kostenstelle" context="{'group_by': 'cost_center'}"/>
+                <filter name="group_department" string="Nach Abteilung" context="{'group_by': 'department_id'}"/>
                 <filter name="expiring_30" string="Läuft in 30 Tagen" domain="[('end_date','!=',False), ('end_date','&lt;=', (context_today() + relativedelta(days=30)).strftime('%%Y-%%m-%%d')), ('end_date','&gt;=', context_today().strftime('%%Y-%%m-%%d'))]"/>
                 <filter name="expiring_60" string="Läuft in 60 Tagen" domain="[('end_date','!=',False), ('end_date','&lt;=', (context_today() + relativedelta(days=60)).strftime('%%Y-%%m-%%d')), ('end_date','&gt;=', context_today().strftime('%%Y-%%m-%%d'))]"/>
                 <filter name="expiring_90" string="Läuft in 90 Tagen" domain="[('end_date','!=',False), ('end_date','&lt;=', (context_today() + relativedelta(days=90)).strftime('%%Y-%%m-%%d')), ('end_date','&gt;=', context_today().strftime('%%Y-%%m-%%d'))]"/>
@@ -603,6 +630,20 @@
         <field name="context">
             {
                 'search_default_high_commitments': 1,
+                'search_default_group_cost_center': 1
+            }
+        </field>
+    </record>
+
+    <record id="action_contract_financial_report" model="ir.actions.act_window">
+        <field name="name">Finanzreport</field>
+        <field name="res_model">contract.contract</field>
+        <field name="view_mode">pivot,graph,list,form</field>
+        <field name="view_id" ref="view_contract_contract_pivot"/>
+        <field name="search_view_id" ref="view_contract_contract_search"/>
+        <field name="context">
+            {
+                'search_default_financial_active': 1,
                 'search_default_group_cost_center': 1
             }
         </field>

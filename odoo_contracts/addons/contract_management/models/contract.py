@@ -89,6 +89,18 @@ class ContractContract(models.Model):
         currency_field="currency_id",
         tracking=True,
     )
+    normalized_monthly_value = fields.Monetary(
+        string="Monatswert",
+        currency_field="currency_id",
+        compute="_compute_normalized_values",
+        store=True,
+    )
+    normalized_annual_value = fields.Monetary(
+        string="Jahreswert",
+        currency_field="currency_id",
+        compute="_compute_normalized_values",
+        store=True,
+    )
     payment_interval = fields.Selection(
         [
             ("monthly", "Monatlich"),
@@ -339,6 +351,29 @@ class ContractContract(models.Model):
                 rec.start_date or fields.Date.context_today(rec),
             )
             rec.requires_manager_approval = amount_company_currency >= threshold
+
+    @api.depends("contract_value", "payment_interval")
+    def _compute_normalized_values(self):
+        interval_divisors = {
+            "monthly": 1.0,
+            "quarterly": 3.0,
+            "semiannual": 6.0,
+            "annual": 12.0,
+        }
+        for rec in self:
+            value = rec.contract_value or 0.0
+            if not value:
+                rec.normalized_monthly_value = 0.0
+                rec.normalized_annual_value = 0.0
+                continue
+            if rec.payment_interval == "one_time":
+                rec.normalized_monthly_value = 0.0
+                rec.normalized_annual_value = value
+                continue
+            divisor = interval_divisors.get(rec.payment_interval, 1.0)
+            monthly_value = value / divisor
+            rec.normalized_monthly_value = monthly_value
+            rec.normalized_annual_value = monthly_value * 12.0
 
     @api.depends("end_date", "termination_notice_months")
     def _compute_earliest_termination_date(self):
