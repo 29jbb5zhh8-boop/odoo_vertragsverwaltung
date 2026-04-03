@@ -19,6 +19,11 @@ class ContractContract(models.Model):
         index=True,
     )
     name = fields.Char(string="Vertragstitel", required=True, tracking=True)
+    template_id = fields.Many2one(
+        "contract.template",
+        string="Vorlage",
+        tracking=True,
+    )
     partner_id = fields.Many2one(
         "res.partner",
         string="Vertragspartner",

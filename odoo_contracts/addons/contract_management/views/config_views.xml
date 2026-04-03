@@ -32,6 +32,82 @@
         <field name="view_mode">list,form</field>
     </record>
 
+    <record id="view_contract_template_tree" model="ir.ui.view">
+        <field name="name">contract.template.tree</field>
+        <field name="model">contract.template</field>
+        <field name="arch" type="xml">
+            <list string="Vertragsvorlagen">
+                <field name="name"/>
+                <field name="contract_kind"/>
+                <field name="type_id"/>
+                <field name="category_id"/>
+                <field name="contract_value"/>
+                <field name="currency_id"/>
+                <field name="payment_interval"/>
+                <field name="approval_user_id"/>
+                <field name="manager_approval_user_id"/>
+                <field name="active"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_contract_template_form" model="ir.ui.view">
+        <field name="name">contract.template.form</field>
+        <field name="model">contract.template</field>
+        <field name="arch" type="xml">
+            <form string="Vertragsvorlage">
+                <header>
+                    <button
+                        name="action_create_contract_from_template"
+                        type="object"
+                        string="Vertrag aus Vorlage erzeugen"
+                        class="btn-primary"
+                    />
+                </header>
+                <sheet>
+                    <group col="2">
+                        <group>
+                            <field name="name"/>
+                            <field name="active"/>
+                            <field name="contract_kind"/>
+                            <field name="type_id"/>
+                            <field name="category_id"/>
+                        </group>
+                        <group>
+                            <field name="department_id"/>
+                            <field name="responsible_user_id"/>
+                            <field name="approval_user_id"/>
+                            <field name="manager_approval_user_id"/>
+                        </group>
+                    </group>
+                    <group col="2">
+                        <group>
+                            <field name="contract_value"/>
+                            <field name="currency_id"/>
+                            <field name="payment_interval"/>
+                            <field name="cost_center"/>
+                        </group>
+                        <group>
+                            <field name="termination_notice_months"/>
+                            <field name="auto_renew"/>
+                            <field name="renewal_period_months" invisible="not auto_renew"/>
+                            <field name="reminder_rule_ids" widget="many2many_tags"/>
+                        </group>
+                    </group>
+                    <group col="1">
+                        <field name="note" nolabel="1" style="width: 100%; min-height: 180px;"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_contract_template" model="ir.actions.act_window">
+        <field name="name">Vertragsvorlagen</field>
+        <field name="res_model">contract.template</field>
+        <field name="view_mode">list,form</field>
+    </record>
+
     <record id="view_contract_reminder_rule_tree" model="ir.ui.view">
         <field name="name">contract.reminder.rule.tree</field>
         <field name="model">contract.reminder.rule</field>

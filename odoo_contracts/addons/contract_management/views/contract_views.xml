@@ -8,6 +8,7 @@
                 <field name="expiry_status" widget="badge" optional="show"/>
                 <field name="contract_number" optional="show"/>
                 <field name="name" optional="show"/>
+                <field name="template_id" optional="show"/>
                 <field name="contract_kind" optional="show"/>
                 <field name="partner_id" optional="show"/>
                 <field name="contract_value" optional="show"/>
@@ -208,6 +209,10 @@
                                         <span class="cm-contract-meta-label">Vertragsnummer</span>
                                         <field name="contract_number" readonly="1" nolabel="1"/>
                                     </div>
+                                    <div class="cm-contract-meta-item" invisible="not template_id">
+                                        <span class="cm-contract-meta-label">Vorlage</span>
+                                        <field name="template_id" nolabel="1" readonly="1"/>
+                                    </div>
                                     <div class="cm-contract-meta-item">
                                         <span class="cm-contract-meta-label">Vertragspartner</span>
                                         <field name="partner_id" nolabel="1"/>
@@ -300,6 +305,7 @@
                                     <div class="cm-contract-card-title">Vertragsdaten</div>
                                     <group col="2">
                                         <group>
+                                            <field name="template_id" string="Vorlage"/>
                                             <field name="contract_number" string="Nummer" readonly="1" style="color: var(--o-main-text-color);"/>
                                             <field name="name" string="Titel"/>
                                             <field name="partner_id" string="Partner"/>

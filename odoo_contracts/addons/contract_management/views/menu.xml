@@ -8,6 +8,7 @@
     <menuitem id="menu_contract_financial_report" name="Finanzreport" parent="menu_contract_root" action="action_contract_financial_report" sequence="25"/>
     <menuitem id="menu_contract_contracts" name="Alle Verträge" parent="menu_contract_root" action="action_contract_contract" sequence="30"/>
     <menuitem id="menu_contract_config" name="Konfiguration" parent="menu_contract_root" sequence="100" groups="contract_management.group_contract_manager"/>
+    <menuitem id="menu_contract_templates" name="Vertragsvorlagen" parent="menu_contract_config" action="action_contract_template" sequence="5" groups="contract_management.group_contract_manager"/>
     <menuitem id="menu_contract_types" name="Vertragstypen" parent="menu_contract_config" action="action_contract_type" sequence="10" groups="contract_management.group_contract_manager"/>
     <menuitem id="menu_contract_categories" name="Vertragskategorien" parent="menu_contract_config" action="action_contract_category" sequence="15" groups="contract_management.group_contract_manager"/>
     <menuitem id="menu_contract_reminders" name="Erinnerungen" parent="menu_contract_config" action="action_contract_reminder_rule" sequence="20" groups="contract_management.group_contract_manager"/>
