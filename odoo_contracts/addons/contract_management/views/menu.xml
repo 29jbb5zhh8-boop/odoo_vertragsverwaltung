@@ -6,8 +6,9 @@
     <menuitem id="menu_contract_critical" name="Kritische Verträge" parent="menu_contract_root" action="action_contract_critical" sequence="15"/>
     <menuitem id="menu_contract_high_commitments" name="Hohe Verpflichtungen" parent="menu_contract_root" action="action_contract_high_commitments" sequence="20"/>
     <menuitem id="menu_contract_financial_report" name="Finanzreport" parent="menu_contract_root" action="action_contract_financial_report" sequence="25"/>
-    <menuitem id="menu_contract_approval_log" name="Freigabeprotokoll" parent="menu_contract_root" action="action_contract_approval_log" sequence="30"/>
-    <menuitem id="menu_contract_contracts" name="Alle Verträge" parent="menu_contract_root" action="action_contract_contract" sequence="35"/>
+    <menuitem id="menu_contract_budget_dashboard" name="Budgetampeln" parent="menu_contract_root" action="action_contract_budget_dashboard" sequence="30"/>
+    <menuitem id="menu_contract_approval_log" name="Freigabeprotokoll" parent="menu_contract_root" action="action_contract_approval_log" sequence="35"/>
+    <menuitem id="menu_contract_contracts" name="Alle Verträge" parent="menu_contract_root" action="action_contract_contract" sequence="40"/>
     <menuitem id="menu_contract_config" name="Konfiguration" parent="menu_contract_root" sequence="100" groups="contract_management.group_contract_manager"/>
     <menuitem id="menu_contract_templates" name="Vertragsvorlagen" parent="menu_contract_config" action="action_contract_template" sequence="5" groups="contract_management.group_contract_manager"/>
     <menuitem id="menu_contract_types" name="Vertragstypen" parent="menu_contract_config" action="action_contract_type" sequence="10" groups="contract_management.group_contract_manager"/>

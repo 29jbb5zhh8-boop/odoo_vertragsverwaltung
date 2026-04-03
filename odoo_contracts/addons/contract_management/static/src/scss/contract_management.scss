@@ -258,6 +258,38 @@
   display: inline-block;
 }
 
+.cm-budget-card {
+  border: 1px solid #dfe7f4;
+  border-radius: 16px;
+  box-shadow: 0 8px 22px rgba(44, 62, 102, 0.06);
+  padding: 16px;
+  background: linear-gradient(180deg, #ffffff 0%, #f9fbff 100%);
+}
+
+.cm-budget-card-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: flex-start;
+  margin-bottom: 14px;
+}
+
+.cm-budget-card-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px 14px;
+}
+
+.cm-budget-card-label {
+  display: block;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #73829d;
+  margin-bottom: 4px;
+}
+
 .cm-attachment-dropzone .o_field_many2many_binary .o_form_binary_form {
   width: 100%;
   text-align: center;
