@@ -8,7 +8,12 @@
                 <field name="expiry_status" widget="badge" optional="show"/>
                 <field name="contract_number" optional="show"/>
                 <field name="name" optional="show"/>
+                <field name="contract_kind" optional="show"/>
                 <field name="partner_id" optional="show"/>
+                <field name="contract_value" optional="show"/>
+                <field name="currency_id" optional="hide"/>
+                <field name="payment_interval" optional="show"/>
+                <field name="cost_center" optional="show"/>
                 <field name="type_id" optional="show"/>
                 <field name="category_id" optional="show"/>
                 <field name="responsible_user_id" optional="show"/>
@@ -100,6 +105,10 @@
                                         <field name="partner_id" nolabel="1"/>
                                     </div>
                                     <div class="cm-contract-meta-item">
+                                        <span class="cm-contract-meta-label">Vertragsart</span>
+                                        <field name="contract_kind" nolabel="1"/>
+                                    </div>
+                                    <div class="cm-contract-meta-item">
                                         <span class="cm-contract-meta-label">Verantwortlich</span>
                                         <field name="responsible_user_id" nolabel="1"/>
                                     </div>
@@ -155,6 +164,10 @@
                                 <span class="cm-contract-summary-label">Erinnerungen</span>
                                 <field name="reminder_rule_ids" widget="many2many_tags" nolabel="1"/>
                             </div>
+                            <div class="cm-contract-summary-item">
+                                <span class="cm-contract-summary-label">Vertragswert</span>
+                                <field name="contract_value" nolabel="1"/>
+                            </div>
                         </div>
 
                         <div class="cm-contract-grid">
@@ -166,6 +179,7 @@
                                             <field name="contract_number" string="Nummer" readonly="1" style="color: var(--o-main-text-color);"/>
                                             <field name="name" string="Titel"/>
                                             <field name="partner_id" string="Partner"/>
+                                            <field name="contract_kind" string="Vertragsart"/>
                                         </group>
                                         <group>
                                             <field name="category_id" string="Kategorie"/>
@@ -186,6 +200,20 @@
                                         <group>
                                             <field name="submitted_for_approval_at" string="Eingereicht am" readonly="1"/>
                                             <field name="approved_at" string="Freigegeben am" readonly="1"/>
+                                        </group>
+                                    </group>
+                                </div>
+
+                                <div class="cm-contract-card">
+                                    <div class="cm-contract-card-title">Kaufmaennische Daten</div>
+                                    <group col="2">
+                                        <group>
+                                            <field name="contract_value" string="Vertragswert"/>
+                                            <field name="currency_id" string="Waehrung"/>
+                                        </group>
+                                        <group>
+                                            <field name="payment_interval" string="Zahlungsintervall"/>
+                                            <field name="cost_center" string="Kostenstelle"/>
                                         </group>
                                     </group>
                                 </div>
@@ -227,6 +255,16 @@
                                         <field name="auto_renew" string="Automatisch verlängern"/>
                                         <field name="renewal_period_months" string="Intervall (Monate)" invisible="not auto_renew"/>
                                         <field name="next_end_date" string="Nächstes Ende" readonly="1"/>
+                                    </group>
+                                </div>
+
+                                <div class="cm-contract-card">
+                                    <div class="cm-contract-card-title">Finanzen</div>
+                                    <group col="1">
+                                        <field name="contract_value" string="Vertragswert"/>
+                                        <field name="currency_id" string="Waehrung"/>
+                                        <field name="payment_interval" string="Zahlungsintervall"/>
+                                        <field name="cost_center" string="Kostenstelle"/>
                                     </group>
                                 </div>
 
@@ -333,7 +371,12 @@
             <search string="Verträge">
                 <field name="contract_number"/>
                 <field name="name"/>
+                <field name="contract_kind"/>
                 <field name="partner_id"/>
+                <field name="contract_value"/>
+                <field name="currency_id"/>
+                <field name="payment_interval"/>
+                <field name="cost_center"/>
                 <field name="type_id"/>
                 <field name="category_id"/>
                 <field name="responsible_user_id"/>
@@ -353,6 +396,14 @@
                 <filter name="approval_pending" string="Zur Freigabe" domain="[('approval_state', '=', 'pending')]"/>
                 <filter name="approval_approved" string="Freigegeben" domain="[('approval_state', '=', 'approved')]"/>
                 <filter name="my_approvals" string="Meine Freigaben" domain="[('approval_user_id', '=', uid), ('approval_state', '=', 'pending')]"/>
+                <filter name="financial_active" string="Aktive Kosten" domain="[('state', 'in', ['active', 'expiring']), ('contract_value', '&gt;', 0)]"/>
+                <filter name="recurring_costs" string="Wiederkehrende Kosten" domain="[('contract_value', '&gt;', 0), ('payment_interval', '!=', 'one_time')]"/>
+                <filter name="customer_contracts" string="Kundenverträge" domain="[('contract_kind', '=', 'customer')]"/>
+                <filter name="supplier_contracts" string="Lieferantenverträge" domain="[('contract_kind', '=', 'supplier')]"/>
+                <separator/>
+                <filter name="group_contract_kind" string="Nach Vertragsart" context="{'group_by': 'contract_kind'}"/>
+                <filter name="group_payment_interval" string="Nach Zahlungsintervall" context="{'group_by': 'payment_interval'}"/>
+                <filter name="group_cost_center" string="Nach Kostenstelle" context="{'group_by': 'cost_center'}"/>
                 <filter name="expiring_30" string="Läuft in 30 Tagen" domain="[('end_date','!=',False), ('end_date','&lt;=', (context_today() + relativedelta(days=30)).strftime('%%Y-%%m-%%d')), ('end_date','&gt;=', context_today().strftime('%%Y-%%m-%%d'))]"/>
                 <filter name="expiring_60" string="Läuft in 60 Tagen" domain="[('end_date','!=',False), ('end_date','&lt;=', (context_today() + relativedelta(days=60)).strftime('%%Y-%%m-%%d')), ('end_date','&gt;=', context_today().strftime('%%Y-%%m-%%d'))]"/>
                 <filter name="expiring_90" string="Läuft in 90 Tagen" domain="[('end_date','!=',False), ('end_date','&lt;=', (context_today() + relativedelta(days=90)).strftime('%%Y-%%m-%%d')), ('end_date','&gt;=', context_today().strftime('%%Y-%%m-%%d'))]"/>

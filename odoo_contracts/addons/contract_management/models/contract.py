@@ -29,6 +29,23 @@ class ContractContract(models.Model):
         string="Vertragstyp",
         tracking=True,
     )
+    contract_kind = fields.Selection(
+        [
+            ("supplier", "Lieferant"),
+            ("customer", "Kunde"),
+            ("rent", "Miete"),
+            ("lease", "Leasing"),
+            ("maintenance", "Wartung"),
+            ("service", "Dienstleistung"),
+            ("license", "Lizenz"),
+            ("insurance", "Versicherung"),
+            ("other", "Sonstiges"),
+        ],
+        string="Vertragsart",
+        default="supplier",
+        required=True,
+        tracking=True,
+    )
     category_id = fields.Many2one(
         "contract.category",
         string="Vertragskategorie",
@@ -49,8 +66,36 @@ class ContractContract(models.Model):
         string="Interne Abteilung",
         tracking=True,
     )
+    cost_center = fields.Char(
+        string="Kostenstelle",
+        tracking=True,
+    )
     start_date = fields.Date(string="Startdatum", tracking=True)
     end_date = fields.Date(string="Enddatum", tracking=True)
+    currency_id = fields.Many2one(
+        "res.currency",
+        string="Waehrung",
+        required=True,
+        default=lambda self: self.env.company.currency_id.id,
+        tracking=True,
+    )
+    contract_value = fields.Monetary(
+        string="Vertragswert",
+        currency_field="currency_id",
+        tracking=True,
+    )
+    payment_interval = fields.Selection(
+        [
+            ("monthly", "Monatlich"),
+            ("quarterly", "Quartalsweise"),
+            ("semiannual", "Halbjaehrlich"),
+            ("annual", "Jaehrlich"),
+            ("one_time", "Einmalig"),
+        ],
+        string="Zahlungsintervall",
+        default="monthly",
+        tracking=True,
+    )
     termination_notice_months = fields.Integer(
         string="Kündigungsfrist (Monate)",
         help="Kündigungsfrist in Monaten.",
@@ -194,6 +239,12 @@ class ContractContract(models.Model):
         for rec in self:
             if rec.start_date and rec.end_date and rec.end_date < rec.start_date:
                 raise ValidationError("Enddatum muss nach dem Startdatum liegen.")
+
+    @api.constrains("contract_value")
+    def _check_contract_value(self):
+        for rec in self:
+            if rec.contract_value and rec.contract_value < 0:
+                raise ValidationError("Der Vertragswert darf nicht negativ sein.")
 
     @api.depends("end_date", "termination_notice_months")
     def _compute_earliest_termination_date(self):
