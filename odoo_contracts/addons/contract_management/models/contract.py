@@ -61,6 +61,11 @@ class ContractContract(models.Model):
         string="Freigeber",
         tracking=True,
     )
+    manager_approval_user_id = fields.Many2one(
+        "res.users",
+        string="Manager-Freigeber",
+        tracking=True,
+    )
     department_id = fields.Many2one(
         "hr.department",
         string="Interne Abteilung",
@@ -143,6 +148,7 @@ class ContractContract(models.Model):
         [
             ("draft", "In Bearbeitung"),
             ("pending", "Zur Freigabe"),
+            ("pending_manager", "Zur Manager-Freigabe"),
             ("approved", "Freigegeben"),
             ("rejected", "Abgelehnt"),
         ],
@@ -162,6 +168,10 @@ class ContractContract(models.Model):
         string="Freigabekommentar",
         readonly=True,
     )
+    manager_approval_comment = fields.Text(
+        string="Manager-Kommentar",
+        readonly=True,
+    )
     rejection_reason = fields.Text(
         string="Ablehnungsgrund",
         readonly=True,
@@ -170,6 +180,15 @@ class ContractContract(models.Model):
         "res.users",
         string="Freigabe entschieden von",
         readonly=True,
+    )
+    manager_approved_at = fields.Datetime(
+        string="Manager-freigegeben am",
+        readonly=True,
+    )
+    requires_manager_approval = fields.Boolean(
+        string="Manager-Freigabe erforderlich",
+        compute="_compute_requires_manager_approval",
+        store=True,
     )
     note = fields.Html(string="Notizen")
     fulltext = fields.Text(string="Volltext", compute="_compute_fulltext", store=True, index=True)
@@ -259,6 +278,68 @@ class ContractContract(models.Model):
             if rec.contract_value and rec.contract_value < 0:
                 raise ValidationError("Der Vertragswert darf nicht negativ sein.")
 
+    @api.constrains(
+        "contract_kind",
+        "partner_id",
+        "contract_value",
+        "payment_interval",
+        "start_date",
+        "end_date",
+    )
+    def _check_contract_kind_requirements(self):
+        value_required_kinds = {
+            "supplier",
+            "customer",
+            "rent",
+            "lease",
+            "maintenance",
+            "service",
+            "license",
+            "insurance",
+        }
+        dated_kinds = {"rent", "lease", "maintenance", "service", "license", "insurance"}
+        for rec in self:
+            errors = []
+            if rec.contract_kind != "other" and not rec.partner_id:
+                errors.append("Vertragspartner ist fuer diese Vertragsart verpflichtend.")
+            if rec.contract_kind in value_required_kinds and not rec.contract_value:
+                errors.append("Vertragswert ist fuer diese Vertragsart verpflichtend.")
+            if rec.contract_kind in value_required_kinds and not rec.payment_interval:
+                errors.append("Zahlungsintervall ist fuer diese Vertragsart verpflichtend.")
+            if rec.contract_kind in dated_kinds and not rec.start_date:
+                errors.append("Startdatum ist fuer diese Vertragsart verpflichtend.")
+            if rec.contract_kind in dated_kinds and not rec.end_date:
+                errors.append("Enddatum ist fuer diese Vertragsart verpflichtend.")
+            if errors:
+                raise ValidationError("\n".join(errors))
+
+    def _get_manager_approval_threshold(self):
+        value = (
+            self.env["ir.config_parameter"]
+            .sudo()
+            .get_param("contract_management.manager_approval_threshold", "10000")
+        )
+        try:
+            return float(value)
+        except (TypeError, ValueError):
+            return 10000.0
+
+    @api.depends("contract_value", "currency_id")
+    def _compute_requires_manager_approval(self):
+        threshold = self._get_manager_approval_threshold()
+        company_currency = self.env.company.currency_id
+        for rec in self:
+            if not rec.contract_value or not rec.currency_id or not company_currency:
+                rec.requires_manager_approval = False
+                continue
+            amount_company_currency = rec.currency_id._convert(
+                rec.contract_value,
+                company_currency,
+                self.env.company,
+                rec.start_date or fields.Date.context_today(rec),
+            )
+            rec.requires_manager_approval = amount_company_currency >= threshold
+
     @api.depends("end_date", "termination_notice_months")
     def _compute_earliest_termination_date(self):
         for rec in self:
@@ -340,6 +421,7 @@ class ContractContract(models.Model):
         self.write({"state": "expired"})
 
     def action_reset_draft(self):
+        self._close_approval_activities()
         self.write(
             {
                 "state": "draft",
@@ -347,13 +429,23 @@ class ContractContract(models.Model):
                 "submitted_for_approval_at": False,
                 "approved_at": False,
                 "approval_comment": False,
+                "manager_approval_comment": False,
                 "rejection_reason": False,
                 "approval_decided_by_id": False,
+                "manager_approved_at": False,
             }
         )
 
     def _check_can_approve(self):
         self.ensure_one()
+        if self.approval_state == "pending_manager":
+            if self.env.user.has_group("contract_management.group_contract_manager"):
+                return
+            if self.manager_approval_user_id == self.env.user:
+                return
+            raise UserError(
+                "Nur der zugewiesene Manager-Freigeber oder ein Vertragsmanager darf in dieser Stufe entscheiden."
+            )
         if self.env.user.has_group("contract_management.group_contract_manager"):
             return
         if self.approval_user_id != self.env.user:
@@ -368,6 +460,7 @@ class ContractContract(models.Model):
             domain = [
                 ("res_model", "=", "contract.contract"),
                 ("res_id", "=", rec.id),
+                ("summary", "ilike", "Freigabe:"),
             ]
             if activity_type:
                 domain.append(("activity_type_id", "=", activity_type.id))
@@ -379,25 +472,35 @@ class ContractContract(models.Model):
             else:
                 activities.unlink()
 
-    def _create_approval_activity(self):
+    def _create_approval_activity(self, stage="approval"):
         activity_type = self._get_approval_activity_type()
         if not activity_type:
             return
         model_id = self.env["ir.model"]._get_id("contract.contract")
         for rec in self:
-            if not rec.approval_user_id:
+            if stage == "manager":
+                target_user = rec.manager_approval_user_id
+                summary = "Freigabe: Manager-Freigabe pruefen"
+                note = (
+                    f"Bitte hochvolumigen Vertrag {rec.display_name} als Manager pruefen."
+                )
+            else:
+                target_user = rec.approval_user_id
+                summary = "Freigabe: Vertrag pruefen"
+                note = (
+                    f"Bitte Vertrag {rec.display_name} pruefen und freigeben oder ablehnen."
+                )
+            if not target_user:
                 continue
             self.env["mail.activity"].sudo().create(
                 {
                     "activity_type_id": activity_type.id,
-                    "summary": "Vertrag zur Freigabe pruefen",
-                    "note": (
-                        f"Bitte Vertrag {rec.display_name} pruefen und freigeben oder ablehnen."
-                    ),
+                    "summary": summary,
+                    "note": note,
                     "date_deadline": fields.Date.context_today(rec),
                     "res_model_id": model_id,
                     "res_id": rec.id,
-                    "user_id": rec.approval_user_id.id,
+                    "user_id": target_user.id,
                 }
             )
 
@@ -407,6 +510,14 @@ class ContractContract(models.Model):
                 raise UserError("Nur Entwuerfe oder abgelehnte Vertraege koennen eingereicht werden.")
             if not rec.approval_user_id:
                 raise UserError("Bitte zuerst einen Freigeber hinterlegen.")
+            if (
+                rec.requires_manager_approval
+                and not rec.manager_approval_user_id
+                and not rec.approval_user_id.has_group("contract_management.group_contract_manager")
+            ):
+                raise UserError(
+                    "Ab diesem Vertragswert ist ein Manager-Freigeber erforderlich."
+                )
             rec._close_approval_activities()
             rec.write(
                 {
@@ -414,8 +525,10 @@ class ContractContract(models.Model):
                     "submitted_for_approval_at": fields.Datetime.now(),
                     "approved_at": False,
                     "approval_comment": False,
+                    "manager_approval_comment": False,
                     "rejection_reason": False,
                     "approval_decided_by_id": False,
+                    "manager_approved_at": False,
                 }
             )
             rec._create_approval_activity()
@@ -434,8 +547,8 @@ class ContractContract(models.Model):
     def action_open_approve_wizard(self):
         self.ensure_one()
         self._check_can_approve()
-        if self.approval_state != "pending":
-            raise UserError("Nur Vertraege im Status 'Zur Freigabe' koennen freigegeben werden.")
+        if self.approval_state not in ("pending", "pending_manager"):
+            raise UserError("Nur Vertraege in einem Freigabeschritt koennen freigegeben werden.")
         return {
             "type": "ir.actions.act_window",
             "name": "Vertrag freigeben",
@@ -451,8 +564,8 @@ class ContractContract(models.Model):
     def action_open_reject_wizard(self):
         self.ensure_one()
         self._check_can_approve()
-        if self.approval_state != "pending":
-            raise UserError("Nur Vertraege im Status 'Zur Freigabe' koennen abgelehnt werden.")
+        if self.approval_state not in ("pending", "pending_manager"):
+            raise UserError("Nur Vertraege in einem Freigabeschritt koennen abgelehnt werden.")
         return {
             "type": "ir.actions.act_window",
             "name": "Vertrag ablehnen",
@@ -467,41 +580,90 @@ class ContractContract(models.Model):
 
     def action_apply_approval_decision(self, decision, comment=False):
         for rec in self:
-            if rec.approval_state != "pending":
+            if rec.approval_state not in ("pending", "pending_manager"):
                 raise UserError("Nur Vertraege im Status 'Zur Freigabe' koennen bearbeitet werden.")
             rec._check_can_approve()
             clean_comment = (comment or "").strip()
             if decision == "reject" and not clean_comment:
                 raise UserError("Bei einer Ablehnung ist ein Kommentar verpflichtend.")
-            values = {
-                "approval_decided_by_id": self.env.user.id,
-            }
+            values = {}
             if decision == "approve":
-                values.update(
-                    {
-                        "approval_state": "approved",
-                        "approved_at": fields.Datetime.now(),
-                        "approval_comment": clean_comment or False,
-                        "rejection_reason": False,
-                    }
-                )
-                feedback = clean_comment or "Vertrag freigegeben."
-                message = "Vertrag freigegeben"
+                if rec.approval_state == "pending" and rec.requires_manager_approval and not self.env.user.has_group(
+                    "contract_management.group_contract_manager"
+                ):
+                    values.update(
+                        {
+                            "approval_state": "pending_manager",
+                            "approval_comment": clean_comment or False,
+                            "rejection_reason": False,
+                            "approval_decided_by_id": self.env.user.id,
+                            "approved_at": False,
+                            "manager_approval_comment": False,
+                            "manager_approved_at": False,
+                        }
+                    )
+                    feedback = clean_comment or "Vorpruefung abgeschlossen."
+                    message = "Vorpruefung abgeschlossen, wartet auf Manager-Freigabe"
+                    rec.write(values)
+                    rec._close_approval_activities(feedback=feedback)
+                    rec._create_approval_activity(stage="manager")
+                else:
+                    values.update(
+                        {
+                            "approval_state": "approved",
+                            "approved_at": fields.Datetime.now(),
+                            "rejection_reason": False,
+                            "approval_decided_by_id": self.env.user.id,
+                        }
+                    )
+                    if rec.approval_state == "pending_manager":
+                        values.update(
+                            {
+                                "manager_approval_comment": clean_comment or False,
+                                "manager_approved_at": fields.Datetime.now(),
+                            }
+                        )
+                    else:
+                        values.update(
+                            {
+                                "approval_comment": clean_comment or False,
+                                "manager_approval_comment": False,
+                                "manager_approved_at": False,
+                            }
+                        )
+                    feedback = clean_comment or "Vertrag freigegeben."
+                    message = "Vertrag freigegeben"
+                    rec.write(values)
+                    rec._close_approval_activities(feedback=feedback)
             elif decision == "reject":
                 values.update(
                     {
                         "approval_state": "rejected",
                         "approved_at": False,
-                        "approval_comment": False,
                         "rejection_reason": clean_comment,
+                        "approval_decided_by_id": self.env.user.id,
+                        "manager_approved_at": False,
                     }
                 )
+                if rec.approval_state == "pending_manager":
+                    values.update(
+                        {
+                            "manager_approval_comment": False,
+                        }
+                    )
+                else:
+                    values.update(
+                        {
+                            "approval_comment": False,
+                            "manager_approval_comment": False,
+                        }
+                    )
                 feedback = clean_comment
                 message = f"Vertrag abgelehnt: {clean_comment}"
+                rec.write(values)
+                rec._close_approval_activities(feedback=feedback)
             else:
                 raise UserError("Unbekannte Freigabeentscheidung.")
-            rec.write(values)
-            rec._close_approval_activities(feedback=feedback)
             rec.message_post(body=message)
             self.env["contract.timeline"].create(
                 {
@@ -578,6 +740,7 @@ class ContractContract(models.Model):
             or "partner_id" in vals
             or "responsible_user_id" in vals
             or "approval_user_id" in vals
+            or "manager_approval_user_id" in vals
         ):
             for rec in self:
                 old_misc[rec.id] = (
@@ -585,6 +748,7 @@ class ContractContract(models.Model):
                     rec.partner_id,
                     rec.responsible_user_id,
                     rec.approval_user_id,
+                    rec.manager_approval_user_id,
                 )
         res = super().write(vals)
         if "state" in vals:
@@ -635,10 +799,11 @@ class ContractContract(models.Model):
             or "partner_id" in vals
             or "responsible_user_id" in vals
             or "approval_user_id" in vals
+            or "manager_approval_user_id" in vals
         ):
             for rec in self:
-                old_type, old_partner, old_resp, old_approver = old_misc.get(
-                    rec.id, (False, False, False, False)
+                old_type, old_partner, old_resp, old_approver, old_manager_approver = old_misc.get(
+                    rec.id, (False, False, False, False, False)
                 )
                 if old_type != rec.type_id:
                     rec.message_post(
@@ -655,6 +820,10 @@ class ContractContract(models.Model):
                 if old_approver != rec.approval_user_id:
                     rec.message_post(
                         body=f"Freigeber geaendert: {old_approver.display_name if old_approver else '-'} → {rec.approval_user_id.display_name if rec.approval_user_id else '-'}"
+                    )
+                if old_manager_approver != rec.manager_approval_user_id:
+                    rec.message_post(
+                        body=f"Manager-Freigeber geaendert: {old_manager_approver.display_name if old_manager_approver else '-'} → {rec.manager_approval_user_id.display_name if rec.manager_approval_user_id else '-'}"
                     )
         for rec, etype, msg in to_log:
             self.env["contract.timeline"].create(

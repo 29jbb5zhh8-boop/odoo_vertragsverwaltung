@@ -18,7 +18,9 @@
                 <field name="category_id" optional="show"/>
                 <field name="responsible_user_id" optional="show"/>
                 <field name="approval_user_id" optional="show"/>
+                <field name="manager_approval_user_id" optional="show"/>
                 <field name="approval_state" widget="badge" optional="show"/>
+                <field name="requires_manager_approval" optional="show"/>
                 <field name="department_id" optional="show"/>
                 <field name="start_date" optional="show" widget="date" options="{'datepicker': {'format': 'DD.MM.YYYY'}}"/>
                 <field name="end_date" optional="show" widget="date" options="{'datepicker': {'format': 'DD.MM.YYYY'}}"/>
@@ -82,12 +84,12 @@
             <form string="Vertrag">
                 <header>
                     <button name="action_submit_for_approval" type="object" string="Zur Freigabe einreichen" class="btn-secondary" invisible="approval_state not in ['draft', 'rejected']"/>
-                    <button name="action_open_approve_wizard" type="object" string="Freigeben" class="btn-primary" groups="contract_management.group_contract_approver,contract_management.group_contract_manager" invisible="approval_state != 'pending'"/>
-                    <button name="action_open_reject_wizard" type="object" string="Ablehnen" class="btn-secondary" groups="contract_management.group_contract_approver,contract_management.group_contract_manager" invisible="approval_state != 'pending'"/>
+                    <button name="action_open_approve_wizard" type="object" string="Freigeben" class="btn-primary" groups="contract_management.group_contract_approver,contract_management.group_contract_manager" invisible="approval_state not in ['pending', 'pending_manager']"/>
+                    <button name="action_open_reject_wizard" type="object" string="Ablehnen" class="btn-secondary" groups="contract_management.group_contract_approver,contract_management.group_contract_manager" invisible="approval_state not in ['pending', 'pending_manager']"/>
                     <button name="action_activate" type="object" string="Aktivieren" class="btn-primary" invisible="state != 'draft' or approval_state != 'approved'"/>
                     <button name="%(contract_management.action_contract_cancel_wizard)d" type="action" string="Kündigen" class="btn-secondary" invisible="state in ['cancelled']" context="{'default_contract_id': id}"/>
                     <field name="state" widget="statusbar" statusbar_visible="draft,active,expiring,expired,cancelled"/>
-                    <field name="approval_state" widget="statusbar" statusbar_visible="draft,pending,approved,rejected"/>
+                    <field name="approval_state" widget="statusbar" statusbar_visible="draft,pending,pending_manager,approved,rejected"/>
                 </header>
                 <sheet>
                     <div class="cm-contract-form">
@@ -115,6 +117,10 @@
                                     <div class="cm-contract-meta-item">
                                         <span class="cm-contract-meta-label">Freigeber</span>
                                         <field name="approval_user_id" nolabel="1"/>
+                                    </div>
+                                    <div class="cm-contract-meta-item" invisible="not requires_manager_approval">
+                                        <span class="cm-contract-meta-label">Manager-Freigeber</span>
+                                        <field name="manager_approval_user_id" nolabel="1"/>
                                     </div>
                                 </div>
                             </div>
@@ -168,6 +174,10 @@
                                 <span class="cm-contract-summary-label">Vertragswert</span>
                                 <field name="contract_value" nolabel="1"/>
                             </div>
+                            <div class="cm-contract-summary-item">
+                                <span class="cm-contract-summary-label">Manager-Pruefung</span>
+                                <field name="requires_manager_approval" nolabel="1"/>
+                            </div>
                         </div>
 
                         <div class="cm-contract-grid">
@@ -195,16 +205,20 @@
                                         <group>
                                             <field name="responsible_user_id" string="Verantwortlich"/>
                                             <field name="approval_user_id" string="Freigeber"/>
+                                            <field name="manager_approval_user_id" string="Manager-Freigeber" invisible="not requires_manager_approval"/>
                                             <field name="approval_state" string="Freigabestatus" readonly="1"/>
+                                            <field name="requires_manager_approval" string="Manager-Pruefung noetig" readonly="1"/>
                                             <field name="approval_decided_by_id" string="Entschieden von" readonly="1"/>
                                         </group>
                                         <group>
                                             <field name="submitted_for_approval_at" string="Eingereicht am" readonly="1"/>
                                             <field name="approved_at" string="Freigegeben am" readonly="1"/>
+                                            <field name="manager_approved_at" string="Manager-freigegeben am" readonly="1" invisible="not manager_approved_at"/>
                                         </group>
                                     </group>
                                     <group col="1">
                                         <field name="approval_comment" string="Freigabekommentar" readonly="1" invisible="not approval_comment"/>
+                                        <field name="manager_approval_comment" string="Manager-Kommentar" readonly="1" invisible="not manager_approval_comment"/>
                                         <field name="rejection_reason" string="Ablehnungsgrund" readonly="1" invisible="not rejection_reason"/>
                                     </group>
                                 </div>
@@ -386,7 +400,9 @@
                 <field name="category_id"/>
                 <field name="responsible_user_id"/>
                 <field name="approval_user_id"/>
+                <field name="manager_approval_user_id"/>
                 <field name="approval_state"/>
+                <field name="requires_manager_approval"/>
                 <field name="department_id"/>
                 <field name="start_date"/>
                 <field name="end_date"/>
@@ -400,9 +416,12 @@
                 <field name="state"/>
                 <filter name="approval_pending" string="Zur Freigabe" domain="[('approval_state', '=', 'pending')]"/>
                 <filter name="approval_approved" string="Freigegeben" domain="[('approval_state', '=', 'approved')]"/>
-                <filter name="my_approvals" string="Meine Freigaben" domain="[('approval_user_id', '=', uid), ('approval_state', '=', 'pending')]"/>
+                <filter name="my_approvals" string="Wartet auf meine Freigabe" domain="['|', '&amp;', ('approval_state', '=', 'pending'), ('approval_user_id', '=', uid), '&amp;', ('approval_state', '=', 'pending_manager'), ('manager_approval_user_id', '=', uid)]"/>
+                <filter name="manager_required" string="Manager-Freigabe noetig" domain="[('requires_manager_approval', '=', True)]"/>
+                <filter name="critical_contracts" string="Kritische Verträge" domain="['|', '&amp;', ('expiry_status', '=', 'red'), ('state', 'in', ['active', 'expiring']), '&amp;', ('approval_state', 'in', ['pending', 'pending_manager']), ('contract_value', '&gt;=', 10000)]"/>
                 <filter name="financial_active" string="Aktive Kosten" domain="[('state', 'in', ['active', 'expiring']), ('contract_value', '&gt;', 0)]"/>
                 <filter name="recurring_costs" string="Wiederkehrende Kosten" domain="[('contract_value', '&gt;', 0), ('payment_interval', '!=', 'one_time')]"/>
+                <filter name="high_commitments" string="Hohe Verpflichtungen" domain="[('contract_kind', '!=', 'customer'), ('contract_value', '&gt;=', 10000)]"/>
                 <filter name="customer_contracts" string="Kundenverträge" domain="[('contract_kind', '=', 'customer')]"/>
                 <filter name="supplier_contracts" string="Lieferantenverträge" domain="[('contract_kind', '=', 'supplier')]"/>
                 <separator/>
