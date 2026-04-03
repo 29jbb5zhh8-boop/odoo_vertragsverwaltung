@@ -1,4 +1,5 @@
 from odoo import api, fields, models
+from odoo.exceptions import ValidationError
 
 
 class ContractCostCenterBudget(models.Model):
@@ -25,6 +26,14 @@ class ContractCostCenterBudget(models.Model):
         string="Jahresbudget",
         currency_field="currency_id",
     )
+    warning_threshold_pct = fields.Float(
+        string="Warnschwelle (%)",
+        default=90.0,
+    )
+    critical_threshold_pct = fields.Float(
+        string="Kritische Schwelle (%)",
+        default=100.0,
+    )
     committed_monthly_value = fields.Monetary(
         string="Ist monatlich",
         currency_field="currency_id",
@@ -47,6 +56,11 @@ class ContractCostCenterBudget(models.Model):
     )
     contract_count = fields.Integer(
         string="Aktive Vertraege",
+        compute="_compute_commitments",
+    )
+    related_contract_ids = fields.Many2many(
+        "contract.contract",
+        string="Zugeordnete Vertraege",
         compute="_compute_commitments",
     )
     budget_state = fields.Selection(
@@ -73,7 +87,15 @@ class ContractCostCenterBudget(models.Model):
     last_notified_at = fields.Datetime(string="Zuletzt gemeldet am", readonly=True, copy=False)
     note = fields.Text(string="Notiz")
 
-    @api.depends("code", "department_id", "monthly_budget", "annual_budget", "currency_id")
+    @api.depends(
+        "code",
+        "department_id",
+        "monthly_budget",
+        "annual_budget",
+        "currency_id",
+        "warning_threshold_pct",
+        "critical_threshold_pct",
+    )
     def _compute_commitments(self):
         contract_model = self.env["contract.contract"]
         today = fields.Date.context_today(self)
@@ -84,6 +106,7 @@ class ContractCostCenterBudget(models.Model):
                 rec.monthly_variance = rec.monthly_budget or 0.0
                 rec.annual_variance = rec.annual_budget or 0.0
                 rec.contract_count = 0
+                rec.related_contract_ids = [(6, 0, [])]
                 rec.budget_state = "green"
                 continue
             domain = [
@@ -115,6 +138,7 @@ class ContractCostCenterBudget(models.Model):
             rec.monthly_variance = (rec.monthly_budget or 0.0) - monthly_total
             rec.annual_variance = (rec.annual_budget or 0.0) - annual_total
             rec.contract_count = len(contracts)
+            rec.related_contract_ids = [(6, 0, contracts.ids)]
             rec.budget_state = rec._get_budget_state(monthly_total, annual_total)
 
     def _get_budget_state(self, monthly_total, annual_total):
@@ -127,11 +151,37 @@ class ContractCostCenterBudget(models.Model):
         for budget, actual in checks:
             if not budget:
                 continue
-            if actual > budget:
+            critical_limit = budget * ((self.critical_threshold_pct or 100.0) / 100.0)
+            warning_limit = budget * ((self.warning_threshold_pct or 90.0) / 100.0)
+            if actual >= critical_limit:
                 return "red"
-            if actual >= (budget * 0.9):
+            if actual >= warning_limit:
                 severity = "yellow"
         return severity
+
+    @api.constrains("warning_threshold_pct", "critical_threshold_pct")
+    def _check_thresholds(self):
+        for rec in self:
+            if rec.warning_threshold_pct <= 0:
+                raise ValidationError("Die Warnschwelle muss groesser als 0 sein.")
+            if rec.critical_threshold_pct < rec.warning_threshold_pct:
+                raise ValidationError("Die kritische Schwelle muss groesser oder gleich der Warnschwelle sein.")
+
+    def action_open_related_contracts(self):
+        self.ensure_one()
+        domain = [
+            ("id", "in", self.related_contract_ids.ids),
+        ]
+        return {
+            "type": "ir.actions.act_window",
+            "name": f"Vertraege zu {self.code}",
+            "res_model": "contract.contract",
+            "view_mode": "kanban,list,form,pivot,graph",
+            "domain": domain,
+            "context": {
+                "search_default_group_cost_center": 1,
+            },
+        }
 
     def _search_budget_state(self, operator, value):
         if operator not in ("=", "!=") or value not in {"green", "yellow", "red"}:

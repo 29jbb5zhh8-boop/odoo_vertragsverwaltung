@@ -290,6 +290,16 @@ class ContractContract(models.Model):
         ],
         string="Budgetstatus",
         compute="_compute_cost_center_budget_info",
+        search="_search_cost_center_budget_state",
+    )
+    cost_center_budget_usage_pct = fields.Float(
+        string="Budgetauslastung (%)",
+        compute="_compute_cost_center_budget_info",
+    )
+    has_cost_center_budget = fields.Boolean(
+        string="Budget zugeordnet",
+        compute="_compute_cost_center_budget_info",
+        search="_search_has_cost_center_budget",
     )
 
     @api.model_create_multi
@@ -460,6 +470,17 @@ class ContractContract(models.Model):
             rec.cost_center_committed_monthly = budget.committed_monthly_value if budget else 0.0
             rec.cost_center_committed_annual = budget.committed_annual_value if budget else 0.0
             rec.cost_center_budget_state = budget.budget_state if budget else False
+            rec.has_cost_center_budget = bool(budget)
+            if budget and budget.monthly_budget:
+                rec.cost_center_budget_usage_pct = (
+                    (budget.committed_monthly_value / budget.monthly_budget) * 100.0
+                )
+            elif budget and budget.annual_budget:
+                rec.cost_center_budget_usage_pct = (
+                    (budget.committed_annual_value / budget.annual_budget) * 100.0
+                )
+            else:
+                rec.cost_center_budget_usage_pct = 0.0
 
     def _create_approval_log(self, stage, decision, assigned_user=None, comment=False):
         log_model = self.env["contract.approval.log"].sudo()
@@ -475,6 +496,27 @@ class ContractContract(models.Model):
                     "approval_state_after": rec.approval_state,
                 }
             )
+
+    def _search_cost_center_budget_state(self, operator, value):
+        if operator not in ("=", "!=") or value not in {"green", "yellow", "red"}:
+            return [("id", "=", 0)]
+        matching_ids = self.search([("cost_center", "!=", False)]).filtered(
+            lambda rec: rec.cost_center_budget_state == value
+        ).ids
+        if operator == "=":
+            return [("id", "in", matching_ids or [0])]
+        return [("id", "not in", matching_ids or [0])]
+
+    def _search_has_cost_center_budget(self, operator, value):
+        if operator not in ("=", "!="):
+            return [("id", "=", 0)]
+        expected = bool(value)
+        matching_ids = self.search([("cost_center", "!=", False)]).filtered(
+            lambda rec: rec.has_cost_center_budget == expected
+        ).ids
+        if operator == "=":
+            return [("id", "in", matching_ids or [0])]
+        return [("id", "not in", matching_ids or [0])]
 
     def _apply_template_package(self, template):
         self.ensure_one()

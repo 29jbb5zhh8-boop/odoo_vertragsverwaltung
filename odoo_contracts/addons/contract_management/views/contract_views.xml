@@ -18,6 +18,7 @@
                 <field name="payment_interval" optional="show"/>
                 <field name="cost_center" optional="show"/>
                 <field name="cost_center_budget_state" widget="badge" optional="show"/>
+                <field name="cost_center_budget_usage_pct" optional="show"/>
                 <field name="type_id" optional="show"/>
                 <field name="category_id" optional="show"/>
                 <field name="responsible_user_id" optional="show"/>
@@ -56,6 +57,8 @@
                 <field name="approval_state"/>
                 <field name="expiry_status"/>
                 <field name="cost_center_budget_state"/>
+                <field name="cost_center_budget_usage_pct"/>
+                <field name="has_cost_center_budget"/>
                 <field name="requires_manager_approval"/>
                 <field name="responsible_user_id"/>
                 <field name="approval_user_id"/>
@@ -100,6 +103,14 @@
                                 <div invisible="not cost_center_budget_state">
                                     <strong>Budget:</strong>
                                     <field name="cost_center_budget_state" widget="badge"/>
+                                </div>
+                                <div invisible="not has_cost_center_budget">
+                                    <strong>Auslastung:</strong>
+                                    <field name="cost_center_budget_usage_pct"/>%
+                                </div>
+                                <div invisible="has_cost_center_budget">
+                                    <strong>Budget:</strong>
+                                    <span class="text-muted">nicht zugeordnet</span>
                                 </div>
                                 <div>
                                     <strong>Freigeber:</strong>
@@ -566,6 +577,8 @@
                 <field name="manager_approval_user_id"/>
                 <field name="approval_state"/>
                 <field name="requires_manager_approval"/>
+                <field name="cost_center_budget_usage_pct"/>
+                <field name="has_cost_center_budget"/>
                 <field name="department_id"/>
                 <field name="start_date"/>
                 <field name="end_date"/>
@@ -587,6 +600,9 @@
                 <filter name="high_commitments" string="Hohe Verpflichtungen" domain="[('contract_kind', '!=', 'customer'), ('contract_value', '&gt;=', 10000)]"/>
                 <filter name="high_monthly_burn" string="Hoher Monatswert" domain="[('normalized_monthly_value', '&gt;=', 1000)]"/>
                 <filter name="high_annual_burn" string="Hoher Jahreswert" domain="[('normalized_annual_value', '&gt;=', 12000)]"/>
+                <filter name="budget_warning_contracts" string="Budgetwarnung" domain="[('cost_center_budget_state', '=', 'yellow')]"/>
+                <filter name="budget_critical_contracts" string="Budget kritisch" domain="[('cost_center_budget_state', '=', 'red')]"/>
+                <filter name="budget_unmapped" string="Ohne Budgetzuordnung" domain="[('cost_center', '!=', False), ('has_cost_center_budget', '=', False)]"/>
                 <filter name="customer_contracts" string="Kundenverträge" domain="[('contract_kind', '=', 'customer')]"/>
                 <filter name="supplier_contracts" string="Lieferantenverträge" domain="[('contract_kind', '=', 'supplier')]"/>
                 <separator/>
@@ -634,7 +650,8 @@
         <field name="context">
             {
                 'search_default_approval_pending': 1,
-                'search_default_group_contract_kind': 1
+                'search_default_group_contract_kind': 1,
+                'search_default_group_cost_center': 1
             }
         </field>
     </record>

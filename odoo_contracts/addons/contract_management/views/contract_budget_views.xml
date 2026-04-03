@@ -4,7 +4,7 @@
         <field name="name">contract.cost.center.budget.kanban</field>
         <field name="model">contract.cost.center.budget</field>
         <field name="arch" type="xml">
-            <kanban class="o_kanban_mobile o_kanban_small_column" default_group_by="budget_state">
+            <kanban class="o_kanban_mobile o_kanban_small_column" default_group_by="department_id">
                 <field name="name"/>
                 <field name="code"/>
                 <field name="department_id"/>
@@ -18,6 +18,7 @@
                 <field name="budget_state"/>
                 <field name="last_notified_state"/>
                 <field name="contract_count"/>
+                <field name="related_contract_ids"/>
                 <templates>
                     <t t-name="card">
                         <div class="o_kanban_record cm-budget-card">
@@ -54,6 +55,9 @@
                                     <div><field name="last_notified_state" widget="badge"/></div>
                                 </div>
                             </div>
+                            <div class="cm-budget-card-actions">
+                                <button name="action_open_related_contracts" type="object" class="btn btn-secondary" string="Verursachende Vertraege"/>
+                            </div>
                         </div>
                     </t>
                 </templates>
@@ -76,6 +80,8 @@
                 <field name="annual_budget"/>
                 <field name="committed_annual_value"/>
                 <field name="budget_state" widget="badge"/>
+                <field name="warning_threshold_pct"/>
+                <field name="critical_threshold_pct"/>
                 <field name="last_notified_state" widget="badge"/>
                 <field name="contract_count"/>
                 <field name="active"/>
@@ -97,6 +103,8 @@
                             <field name="owner_user_id"/>
                             <field name="escalation_user_id"/>
                             <field name="currency_id"/>
+                            <field name="warning_threshold_pct"/>
+                            <field name="critical_threshold_pct"/>
                             <field name="active"/>
                         </group>
                         <group>
@@ -118,6 +126,20 @@
                         <group>
                             <field name="note"/>
                         </group>
+                    </group>
+                    <group col="1" string="Verursachende Vertraege">
+                        <button name="action_open_related_contracts" type="object" class="btn-secondary" string="Alle zugeordneten Vertraege oeffnen"/>
+                        <field name="related_contract_ids" readonly="1" nolabel="1">
+                            <list string="Verursachende Vertraege" create="false" edit="false" delete="false">
+                                <field name="contract_number"/>
+                                <field name="name"/>
+                                <field name="partner_id"/>
+                                <field name="normalized_monthly_value"/>
+                                <field name="normalized_annual_value"/>
+                                <field name="state"/>
+                                <field name="cost_center_budget_state" widget="badge"/>
+                            </list>
+                        </field>
                     </group>
                 </sheet>
             </form>
