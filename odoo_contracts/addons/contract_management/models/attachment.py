@@ -298,7 +298,7 @@ class IrAttachment(models.Model):
 
     def write(self, vals):
         res = super().write(vals)
-        if "show_in_contract" in vals:
+        if "show_in_contract" in vals or "is_current" in vals:
             for rec in self:
                 if rec.res_model != "contract.contract" or not rec.res_id:
                     continue
@@ -311,6 +311,15 @@ class IrAttachment(models.Model):
                             ("show_in_contract", "=", True),
                         ]
                     ).write({"show_in_contract": False})
+                if vals.get("is_current"):
+                    self.search(
+                        [
+                            ("res_model", "=", "contract.contract"),
+                            ("res_id", "=", rec.res_id),
+                            ("id", "!=", rec.id),
+                            ("is_current", "=", True),
+                        ]
+                    ).write({"is_current": False})
         return res
 
     @api.depends("version")
@@ -344,6 +353,36 @@ class IrAttachment(models.Model):
             "target": "new",
             "context": {"default_attachment_id": self.id},
         }
+
+    def action_set_as_current(self):
+        self.ensure_one()
+        if self.res_model != "contract.contract" or not self.res_id:
+            return False
+        self.write({"is_current": True})
+        self.env["contract.timeline"].create(
+            {
+                "contract_id": self.res_id,
+                "event_type": "attachment",
+                "message": f"Aktuelle Fassung gesetzt: {self.name}",
+                "user_id": self.env.user.id,
+            }
+        )
+        return True
+
+    def action_set_show_in_contract(self):
+        self.ensure_one()
+        if self.res_model != "contract.contract" or not self.res_id:
+            return False
+        self.write({"show_in_contract": True})
+        self.env["contract.timeline"].create(
+            {
+                "contract_id": self.res_id,
+                "event_type": "attachment",
+                "message": f"Als gueltige Vertragsfassung markiert: {self.name}",
+                "user_id": self.env.user.id,
+            }
+        )
+        return True
 
     def action_noop(self):
         return False

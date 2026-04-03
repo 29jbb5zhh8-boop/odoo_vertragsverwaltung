@@ -80,129 +80,242 @@
                     <button name="action_approve" type="object" string="Freigeben" class="btn-primary" groups="contract_management.group_contract_approver,contract_management.group_contract_manager" invisible="approval_state != 'pending'"/>
                     <button name="action_reject" type="object" string="Ablehnen" class="btn-secondary" groups="contract_management.group_contract_approver,contract_management.group_contract_manager" invisible="approval_state != 'pending'"/>
                     <button name="action_activate" type="object" string="Aktivieren" class="btn-primary" invisible="state != 'draft' or approval_state != 'approved'"/>
-                    <button name="action_set_expired" type="object" string="Als abgelaufen markieren" invisible="state not in ['active', 'expiring']"/>
                     <button name="%(contract_management.action_contract_cancel_wizard)d" type="action" string="Kündigen" class="btn-secondary" invisible="state in ['cancelled']" context="{'default_contract_id': id}"/>
-                    <button name="action_reset_draft" type="object" string="Auf Entwurf setzen" invisible="state not in ['cancelled', 'expired']"/>
-                    <button name="action_renew" type="object" string="Verlängern" invisible="not end_date"/>
-                    <button name="action_print_pdf_with_attachments" type="object" string="PDF drucken" class="btn-secondary"/>
-                    <button name="action_toggle_chatter" type="object" string="Chatter ausblenden" class="btn-secondary" invisible="show_chatter == False"/>
-                    <button name="action_toggle_chatter" type="object" string="Chatter einblenden" class="btn-secondary" invisible="show_chatter == True"/>
                     <field name="state" widget="statusbar" statusbar_visible="draft,active,expiring,expired,cancelled"/>
                     <field name="approval_state" widget="statusbar" statusbar_visible="draft,pending,approved,rejected"/>
                 </header>
                 <sheet>
-                    <group col="2">
-                        <group>
-                            <field name="contract_number" readonly="1" style="color: var(--o-main-text-color);"/>
-                            <field name="name"/>
-                            <field name="state"/>
-                            <field name="approval_state" readonly="1"/>
-                        </group>
-                        <group>
-                            <field name="partner_id"/>
-                            <field name="responsible_user_id"/>
-                            <field name="approval_user_id"/>
-                        </group>
-                    </group>
-
-                    <separator string="Freigabe"/>
-                    <group col="2">
-                        <group>
-                            <field name="submitted_for_approval_at" readonly="1"/>
-                            <field name="approved_at" readonly="1"/>
-                        </group>
-                        <group>
-                            <field name="approval_user_id" readonly="1"/>
-                        </group>
-                    </group>
-
-                    <separator string="Klassifikation"/>
-                    <group col="2">
-                        <group>
-                            <field name="category_id"/>
-                            <field name="department_id"/>
-                        </group>
-                        <group>
-                            <field name="type_id"/>
-                        </group>
-                    </group>
-
-                    <separator string="Laufzeit &amp; Kündigung"/>
-                    <group col="2">
-                        <group>
-                            <field name="start_date" widget="date" options="{'datepicker': {'format': 'DD.MM.YYYY'}}"/>
-                            <field name="end_date" widget="date" options="{'datepicker': {'format': 'DD.MM.YYYY'}}"/>
-                        </group>
-                        <group>
-                            <field name="termination_notice_months"/>
-                            <field name="earliest_termination_date" readonly="1"/>
-                        </group>
-                    </group>
-
-                    <separator string="Verlängerung"/>
-                    <group col="2">
-                        <group>
-                            <field name="auto_renew"/>
-                            <field name="renewal_period_months" invisible="not auto_renew"/>
-                        </group>
-                        <group>
-                            <field name="next_end_date" readonly="1"/>
-                        </group>
-                    </group>
-
-                    <separator string="Erinnerungen"/>
-                    <group col="2">
-                        <field name="reminder_rule_ids" widget="many2many_tags" colspan="2"/>
-                    </group>
-
-                    <separator string="Notizen"/>
-                    <group col="2">
-                        <field name="note" colspan="2" style="width: 100%; min-height: 180px;" nolabel="1"/>
-                        <field name="cancellation_reason" colspan="2" readonly="1"/>
-                    </group>
-                    <separator string="Attachments"/>
-                    <field name="show_chatter" invisible="1"/>
-                    <div class="o_row">
-                        <div class="o_col-12">
-                            <div class="cm-attachment-dropzone mt16">
-                                <div class="cm-dropzone-title">PDFs hierhin ziehen</div>
-                                <div class="text-muted" style="text-align: center; margin-bottom: 8px;">
-                                    Oder den Upload-Button nutzen
+                    <div class="cm-contract-form">
+                        <div class="cm-contract-hero">
+                            <div class="cm-contract-hero-main">
+                                <div class="cm-contract-eyebrow">Vertrag</div>
+                                <field name="name" class="cm-contract-title"/>
+                                <div class="cm-contract-meta">
+                                    <div class="cm-contract-meta-item">
+                                        <span class="cm-contract-meta-label">Vertragsnummer</span>
+                                        <field name="contract_number" readonly="1" nolabel="1"/>
+                                    </div>
+                                    <div class="cm-contract-meta-item">
+                                        <span class="cm-contract-meta-label">Vertragspartner</span>
+                                        <field name="partner_id" nolabel="1"/>
+                                    </div>
+                                    <div class="cm-contract-meta-item">
+                                        <span class="cm-contract-meta-label">Verantwortlich</span>
+                                        <field name="responsible_user_id" nolabel="1"/>
+                                    </div>
+                                    <div class="cm-contract-meta-item">
+                                        <span class="cm-contract-meta-label">Freigeber</span>
+                                        <field name="approval_user_id" nolabel="1"/>
+                                    </div>
                                 </div>
-                                <div class="text-muted" style="text-align: center; margin-bottom: 8px;">
-                                    Erlaubt: PDF, PNG, JPG, JPEG, WEBP, BMP, TIF, TIFF, GIF
-                                </div>
-                                <field
-                                    name="attachment_ids"
-                                    widget="many2many_binary"
-                                    context="{'default_res_model': 'contract.contract', 'default_res_id': id}"
-                                    options="{'accepted_file_extensions': '.pdf,.png,.jpg,.jpeg,.webp,.bmp,.tif,.tiff,.gif'}"
-                                />
                             </div>
-                            <div class="cm-attachment-table mt16">
-                                <field
-                                    name="attachment_ids"
-                                    domain="[('show_in_contract','=',True)]"
-                                    context="{'default_res_model': 'contract.contract', 'default_res_id': id}"
-                                    options="{'no_create': True, 'no_create_edit': True, 'no_quick_create': True, 'no_open': True}"
-                                >
-                                    <list string="Anhänge" create="false" edit="true" delete="true" class="cm-attachment-list">
-                                        <button name="action_download" type="object" icon="fa-file-pdf-o" string="" title="PDF öffnen"/>
-                                        <button name="action_download_file" type="object" icon="fa-download" string="" title="Download"/>
-                                        <button name="action_rename_attachment" type="object" icon="fa-pencil" string="" title="Dateiname ändern"/>
-                                        <field name="name" string="Datei" optional="show"/>
-                                        <field name="internal_name" string="Interner Name" optional="show"/>
-                                        <field name="version_label" string="Version" optional="show"/>
-                                        <field name="is_current" widget="boolean_toggle" string="Aktuell" optional="show"/>
-                                        <field name="show_in_contract" widget="boolean_toggle" string="Sichtbar" optional="show"/>
-                                        <field name="create_date" string="Hochgeladen am" optional="show"/>
-                                        <field name="create_uid" string="Hochgeladen von" optional="show"/>
-                                        <field name="file_size" string="Größe" optional="show"/>
-                                    </list>
-                                </field>
+                            <div class="cm-contract-aside-card">
+                                <div class="cm-contract-card-title">Übersicht</div>
+                                <div class="cm-contract-aside-line">
+                                    <span class="cm-contract-summary-label">Status</span>
+                                    <field name="state" widget="badge" nolabel="1" readonly="1"/>
+                                </div>
+                                <div class="cm-contract-aside-line">
+                                    <span class="cm-contract-summary-label">Freigabe</span>
+                                    <field name="approval_state" widget="badge" nolabel="1" readonly="1"/>
+                                </div>
+                                <div class="cm-contract-aside-line">
+                                    <span class="cm-contract-summary-label">Ampel</span>
+                                    <field name="expiry_status" widget="badge" nolabel="1" readonly="1"/>
+                                </div>
+                                <div class="cm-contract-aside-line">
+                                    <span class="cm-contract-summary-label">Enddatum</span>
+                                    <field name="end_date" widget="date" options="{'datepicker': {'format': 'DD.MM.YYYY'}}" nolabel="1" readonly="1"/>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="cm-contract-kpi-strip">
+                            <div class="cm-contract-summary-item">
+                                <span class="cm-contract-summary-label">Start</span>
+                                <field name="start_date" widget="date" options="{'datepicker': {'format': 'DD.MM.YYYY'}}" nolabel="1"/>
+                            </div>
+                            <div class="cm-contract-summary-item">
+                                <span class="cm-contract-summary-label">Kündbar ab</span>
+                                <field name="earliest_termination_date" nolabel="1" readonly="1"/>
+                            </div>
+                            <div class="cm-contract-summary-item">
+                                <span class="cm-contract-summary-label">Frist</span>
+                                <field name="termination_notice_months" nolabel="1"/>
+                            </div>
+                            <div class="cm-contract-summary-item">
+                                <span class="cm-contract-summary-label">Verlängerung</span>
+                                <field name="auto_renew" nolabel="1"/>
+                            </div>
+                            <div class="cm-contract-summary-item">
+                                <span class="cm-contract-summary-label">Nächstes Enddatum</span>
+                                <field name="next_end_date" nolabel="1" readonly="1"/>
+                            </div>
+                            <div class="cm-contract-summary-item">
+                                <span class="cm-contract-summary-label">Erinnerungen</span>
+                                <field name="reminder_rule_ids" widget="many2many_tags" nolabel="1"/>
+                            </div>
+                        </div>
+
+                        <div class="cm-contract-grid">
+                            <div class="cm-contract-main">
+                                <div class="cm-contract-card">
+                                    <div class="cm-contract-card-title">Vertragsdaten</div>
+                                    <group col="2">
+                                        <group>
+                                            <field name="contract_number" string="Nummer" readonly="1" style="color: var(--o-main-text-color);"/>
+                                            <field name="name" string="Titel"/>
+                                            <field name="partner_id" string="Partner"/>
+                                        </group>
+                                        <group>
+                                            <field name="category_id" string="Kategorie"/>
+                                            <field name="type_id" string="Typ"/>
+                                            <field name="department_id" string="Abteilung"/>
+                                        </group>
+                                    </group>
+                                </div>
+
+                                <div class="cm-contract-card">
+                                    <div class="cm-contract-card-title">Verantwortung &amp; Freigabe</div>
+                                    <group col="2">
+                                        <group>
+                                            <field name="responsible_user_id" string="Verantwortlich"/>
+                                            <field name="approval_user_id" string="Freigeber"/>
+                                            <field name="approval_state" string="Freigabestatus" readonly="1"/>
+                                        </group>
+                                        <group>
+                                            <field name="submitted_for_approval_at" string="Eingereicht am" readonly="1"/>
+                                            <field name="approved_at" string="Freigegeben am" readonly="1"/>
+                                        </group>
+                                    </group>
+                                </div>
+
+                                <div class="cm-contract-card">
+                                    <div class="cm-contract-card-title">Notizen</div>
+                                    <group col="1">
+                                        <field name="note" nolabel="1" style="width: 100%; min-height: 220px;"/>
+                                    </group>
+                                </div>
+                            </div>
+
+                            <div class="cm-contract-side">
+                                <div class="cm-contract-card">
+                                    <div class="cm-contract-card-title">Aktionen</div>
+                                    <div class="cm-contract-actions">
+                                        <button name="action_renew" type="object" string="Verlängern" class="btn btn-primary" invisible="not end_date"/>
+                                        <button name="action_set_expired" type="object" string="Als abgelaufen markieren" class="btn btn-secondary" invisible="state not in ['active', 'expiring']"/>
+                                        <button name="action_reset_draft" type="object" string="Auf Entwurf setzen" class="btn btn-secondary" invisible="state not in ['cancelled', 'expired']"/>
+                                        <button name="action_print_pdf_with_attachments" type="object" string="PDF drucken" class="btn btn-secondary"/>
+                                        <button name="action_toggle_chatter" type="object" string="Chatter ausblenden" class="btn btn-secondary" invisible="show_chatter == False"/>
+                                        <button name="action_toggle_chatter" type="object" string="Chatter einblenden" class="btn btn-secondary" invisible="show_chatter == True"/>
+                                    </div>
+                                </div>
+
+                                <div class="cm-contract-card cm-contract-card-accent">
+                                    <div class="cm-contract-card-title">Fristen</div>
+                                    <group col="1">
+                                        <field name="start_date" string="Start" widget="date" options="{'datepicker': {'format': 'DD.MM.YYYY'}}"/>
+                                        <field name="end_date" string="Ende" widget="date" options="{'datepicker': {'format': 'DD.MM.YYYY'}}"/>
+                                        <field name="termination_notice_months" string="Kündigungsfrist"/>
+                                        <field name="earliest_termination_date" string="Kündbar ab" readonly="1"/>
+                                    </group>
+                                </div>
+
+                                <div class="cm-contract-card">
+                                    <div class="cm-contract-card-title">Automatik</div>
+                                    <group col="1">
+                                        <field name="auto_renew" string="Automatisch verlängern"/>
+                                        <field name="renewal_period_months" string="Intervall (Monate)" invisible="not auto_renew"/>
+                                        <field name="next_end_date" string="Nächstes Ende" readonly="1"/>
+                                    </group>
+                                </div>
+
+                                <div class="cm-contract-card">
+                                    <div class="cm-contract-card-title">Hinweise</div>
+                                    <group col="1">
+                                        <field name="reminder_rule_ids" string="Erinnerungen" widget="many2many_tags"/>
+                                        <field name="cancellation_reason" string="Kündigungsgrund" readonly="1"/>
+                                    </group>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div name="cm_contract_timeline_anchor"/>
+
+                        <div class="cm-contract-card cm-contract-attachments-card">
+                            <div class="cm-contract-card-title">Anhänge</div>
+                            <div class="cm-contract-card-subtitle">Gueltige Fassung und komplette Dokumenthistorie an einem Ort</div>
+                            <div class="cm-attachment-layout">
+                                <div class="cm-attachment-dropzone">
+                                    <div class="cm-dropzone-title">PDFs oder Bilder hierhin ziehen</div>
+                                    <div class="text-muted" style="text-align: center; margin-bottom: 8px;">
+                                        Oder den Upload-Button nutzen
+                                    </div>
+                                    <div class="text-muted" style="text-align: center; margin-bottom: 8px;">
+                                        Erlaubt: PDF, PNG, JPG, JPEG, WEBP, BMP, TIF, TIFF, GIF
+                                    </div>
+                                    <field
+                                        name="attachment_ids"
+                                        widget="many2many_binary"
+                                        context="{'default_res_model': 'contract.contract', 'default_res_id': id}"
+                                        options="{'accepted_file_extensions': '.pdf,.png,.jpg,.jpeg,.webp,.bmp,.tif,.tiff,.gif'}"
+                                    />
+                                </div>
+                                <div class="cm-attachment-panels">
+                                    <div class="cm-attachment-table mt16">
+                                        <div class="cm-attachment-section-title">Gueltige Vertragsfassung</div>
+                                        <field
+                                            name="attachment_ids"
+                                            domain="[('show_in_contract','=',True)]"
+                                            context="{'default_res_model': 'contract.contract', 'default_res_id': id}"
+                                            options="{'no_create': True, 'no_create_edit': True, 'no_quick_create': True, 'no_open': True}"
+                                        >
+                                            <list string="Gueltige Vertragsfassung" create="false" edit="true" delete="true" class="cm-attachment-list">
+                                                <button name="action_download" type="object" icon="fa-file-pdf-o" string="" title="PDF öffnen"/>
+                                                <button name="action_download_file" type="object" icon="fa-download" string="" title="Download"/>
+                                                <button name="action_rename_attachment" type="object" icon="fa-pencil" string="" title="Umbenennen"/>
+                                                <field name="name" string="Datei" optional="show"/>
+                                                <field name="internal_name" string="Interner Titel" optional="show"/>
+                                                <field name="version_label" string="Version" optional="show"/>
+                                                <field name="is_current" widget="boolean_toggle" string="Aktuell" optional="show"/>
+                                                <field name="show_in_contract" widget="boolean_toggle" string="Im Vertrag" optional="show"/>
+                                                <field name="create_date" string="Upload" optional="show"/>
+                                                <field name="create_uid" string="Von" optional="show"/>
+                                                <field name="file_size" string="Groesse" optional="show"/>
+                                            </list>
+                                        </field>
+                                    </div>
+
+                                    <div class="cm-attachment-table mt16">
+                                        <div class="cm-attachment-section-title">Dokumentenhistorie</div>
+                                        <field
+                                            name="attachment_ids"
+                                            context="{'default_res_model': 'contract.contract', 'default_res_id': id}"
+                                            options="{'no_create': True, 'no_create_edit': True, 'no_quick_create': True, 'no_open': True}"
+                                        >
+                                            <list string="Dokumentenhistorie" create="false" edit="true" delete="true" class="cm-attachment-list">
+                                                <button name="action_set_as_current" type="object" icon="fa-star" string="" title="Als aktuelle Fassung markieren"/>
+                                                <button name="action_set_show_in_contract" type="object" icon="fa-check-square-o" string="" title="Als gueltige Vertragsfassung markieren"/>
+                                                <button name="action_download" type="object" icon="fa-file-pdf-o" string="" title="PDF öffnen"/>
+                                                <button name="action_download_file" type="object" icon="fa-download" string="" title="Download"/>
+                                                <button name="action_rename_attachment" type="object" icon="fa-pencil" string="" title="Umbenennen"/>
+                                                <field name="name" string="Datei" optional="show"/>
+                                                <field name="internal_name" string="Interner Titel" optional="show"/>
+                                                <field name="version_label" string="Version" optional="show"/>
+                                                <field name="is_current" widget="boolean_toggle" string="Aktuell" optional="show"/>
+                                                <field name="show_in_contract" widget="boolean_toggle" string="Im Vertrag" optional="show"/>
+                                                <field name="ocr_state" widget="badge" string="OCR" optional="show"/>
+                                                <field name="create_date" string="Upload" optional="show"/>
+                                                <field name="create_uid" string="Von" optional="show"/>
+                                                <field name="file_size" string="Groesse" optional="show"/>
+                                            </list>
+                                        </field>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
+                    <field name="show_chatter" invisible="1"/>
                 </sheet>
                 <chatter invisible="show_chatter == False">
                     <field name="message_follower_ids"/>
