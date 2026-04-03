@@ -92,4 +92,36 @@
             </div>
         </field>
     </record>
+
+    <record id="mail_template_budget_yellow" model="mail.template">
+        <field name="name">Budget Warning Yellow</field>
+        <field name="model_id" ref="model_contract_cost_center_budget"/>
+        <field name="subject">Budgetwarnung: Kostenstelle ${object.code} erreicht Warnschwelle</field>
+        <field name="email_to">${object.owner_user_id.partner_id.email or object.owner_user_id.email or object.escalation_user_id.partner_id.email or object.escalation_user_id.email or ''}</field>
+        <field name="body_html" type="html">
+            <div>
+                <p>die Kostenstelle <strong>${object.code}</strong> hat die Budgetwarnschwelle erreicht.</p>
+                <p>Budget: ${object.name}</p>
+                <p>Monatlich: ${format_amount(object.committed_monthly_value, object.currency_id)} von ${format_amount(object.monthly_budget, object.currency_id) if object.monthly_budget else '-'}</p>
+                <p>Jaehrlich: ${format_amount(object.committed_annual_value, object.currency_id)} von ${format_amount(object.annual_budget, object.currency_id) if object.annual_budget else '-'}</p>
+                <p>Bitte pruefen Sie die aktiven Verpflichtungen dieser Kostenstelle.</p>
+            </div>
+        </field>
+    </record>
+
+    <record id="mail_template_budget_red" model="mail.template">
+        <field name="name">Budget Warning Red</field>
+        <field name="model_id" ref="model_contract_cost_center_budget"/>
+        <field name="subject">Budgeteskalation: Kostenstelle ${object.code} ist ueber Budget</field>
+        <field name="email_to">${object.escalation_user_id.partner_id.email or object.escalation_user_id.email or object.owner_user_id.partner_id.email or object.owner_user_id.email or ''}</field>
+        <field name="body_html" type="html">
+            <div>
+                <p>die Kostenstelle <strong>${object.code}</strong> liegt ueber Budget.</p>
+                <p>Budget: ${object.name}</p>
+                <p>Monatlich: ${format_amount(object.committed_monthly_value, object.currency_id)} von ${format_amount(object.monthly_budget, object.currency_id) if object.monthly_budget else '-'}</p>
+                <p>Jaehrlich: ${format_amount(object.committed_annual_value, object.currency_id)} von ${format_amount(object.annual_budget, object.currency_id) if object.annual_budget else '-'}</p>
+                <p>Bitte leiten Sie kurzfristig Gegenmassnahmen ein.</p>
+            </div>
+        </field>
+    </record>
 </odoo>

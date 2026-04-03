@@ -28,6 +28,7 @@
         "data/contract_ocr_cron.xml",
         "data/contract_mail_templates.xml",
         "data/contract_approval_escalation_cron.xml",
+        "data/contract_budget_escalation_cron.xml",
         "data/report_contract.xml",
         "views/attachment_rename_wizard.xml",
         "views/ocr_log_views.xml",

@@ -9,6 +9,8 @@ class ContractCostCenterBudget(models.Model):
     name = fields.Char(string="Budgetname", required=True)
     code = fields.Char(string="Kostenstelle", required=True, index=True)
     department_id = fields.Many2one("hr.department", string="Abteilung")
+    owner_user_id = fields.Many2one("res.users", string="Budgetverantwortlich")
+    escalation_user_id = fields.Many2one("res.users", string="Eskalations-Empfaenger")
     currency_id = fields.Many2one(
         "res.currency",
         string="Waehrung",
@@ -58,6 +60,17 @@ class ContractCostCenterBudget(models.Model):
         search="_search_budget_state",
     )
     active = fields.Boolean(default=True)
+    last_notified_state = fields.Selection(
+        [
+            ("green", "Im Budget"),
+            ("yellow", "Beobachten"),
+            ("red", "Ueber Budget"),
+        ],
+        string="Zuletzt gemeldet",
+        readonly=True,
+        copy=False,
+    )
+    last_notified_at = fields.Datetime(string="Zuletzt gemeldet am", readonly=True, copy=False)
     note = fields.Text(string="Notiz")
 
     @api.depends("code", "department_id", "monthly_budget", "annual_budget", "currency_id")
@@ -127,3 +140,78 @@ class ContractCostCenterBudget(models.Model):
         if operator == "=":
             return [("id", "in", matching_ids or [0])]
         return [("id", "not in", matching_ids or [0])]
+
+    def _get_notification_user(self):
+        self.ensure_one()
+        return self.owner_user_id or self.escalation_user_id
+
+    def _send_mail_template(self, xmlid):
+        template = self.env.ref(xmlid, raise_if_not_found=False)
+        if not template:
+            return
+        for rec in self:
+            template.send_mail(rec.id, force_send=False)
+
+    def _create_budget_activity(self, summary, note, user):
+        activity_type = self.env.ref("mail.mail_activity_data_todo", raise_if_not_found=False)
+        if not activity_type or not user:
+            return
+        model_id = self.env["ir.model"]._get_id("contract.cost.center.budget")
+        for rec in self:
+            existing = self.env["mail.activity"].sudo().search(
+                [
+                    ("res_model", "=", "contract.cost.center.budget"),
+                    ("res_id", "=", rec.id),
+                    ("summary", "=", summary),
+                    ("user_id", "=", user.id),
+                ],
+                limit=1,
+            )
+            if existing:
+                continue
+            self.env["mail.activity"].sudo().create(
+                {
+                    "activity_type_id": activity_type.id,
+                    "summary": summary,
+                    "note": note,
+                    "date_deadline": fields.Date.context_today(rec),
+                    "res_model_id": model_id,
+                    "res_id": rec.id,
+                    "user_id": user.id,
+                }
+            )
+
+    def _cron_budget_escalation(self):
+        budgets = self.search([("active", "=", True)])
+        for budget in budgets:
+            if budget.budget_state not in {"yellow", "red"}:
+                continue
+            if budget.last_notified_state == budget.budget_state:
+                continue
+            target_user = budget._get_notification_user()
+            if budget.budget_state == "red":
+                if budget.escalation_user_id:
+                    target_user = budget.escalation_user_id
+                budget._send_mail_template("contract_management.mail_template_budget_red")
+                summary = "Budget: Kostenstelle ueber Budget"
+                note = (
+                    f"Kostenstelle {budget.code} liegt ueber Budget. "
+                    f"Monatlich: {budget.committed_monthly_value} / {budget.monthly_budget or 0.0}. "
+                    f"Jaehrlich: {budget.committed_annual_value} / {budget.annual_budget or 0.0}."
+                )
+            else:
+                budget._send_mail_template("contract_management.mail_template_budget_yellow")
+                summary = "Budget: Kostenstelle beobachten"
+                note = (
+                    f"Kostenstelle {budget.code} hat die Warnschwelle erreicht. "
+                    f"Monatlich: {budget.committed_monthly_value} / {budget.monthly_budget or 0.0}. "
+                    f"Jaehrlich: {budget.committed_annual_value} / {budget.annual_budget or 0.0}."
+                )
+            if target_user:
+                budget._create_budget_activity(summary=summary, note=note, user=target_user)
+            budget.write(
+                {
+                    "last_notified_state": budget.budget_state,
+                    "last_notified_at": fields.Datetime.now(),
+                }
+            )
