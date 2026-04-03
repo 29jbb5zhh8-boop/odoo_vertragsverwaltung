@@ -38,6 +38,7 @@
         <field name="arch" type="xml">
             <list string="Vertragsvorlagen">
                 <field name="name"/>
+                <field name="approval_state" widget="badge"/>
                 <field name="contract_kind"/>
                 <field name="type_id"/>
                 <field name="category_id"/>
@@ -58,6 +59,27 @@
             <form string="Vertragsvorlage">
                 <header>
                     <button
+                        name="action_approve_template"
+                        type="object"
+                        string="Freigeben"
+                        class="btn-primary"
+                        invisible="approval_state == 'approved'"
+                    />
+                    <button
+                        name="action_reject_template"
+                        type="object"
+                        string="Ablehnen"
+                        class="btn-secondary"
+                        invisible="approval_state == 'rejected'"
+                    />
+                    <button
+                        name="action_reset_template_draft"
+                        type="object"
+                        string="Auf Entwurf setzen"
+                        class="btn-secondary"
+                        invisible="approval_state == 'draft'"
+                    />
+                    <button
                         name="action_create_contract_from_template"
                         type="object"
                         string="Vertrag aus Vorlage erzeugen"
@@ -69,6 +91,7 @@
                         <group>
                             <field name="name"/>
                             <field name="active"/>
+                            <field name="approval_state" readonly="1"/>
                             <field name="contract_kind"/>
                             <field name="type_id"/>
                             <field name="category_id"/>
@@ -78,6 +101,8 @@
                             <field name="responsible_user_id"/>
                             <field name="approval_user_id"/>
                             <field name="manager_approval_user_id"/>
+                            <field name="approved_by_id" readonly="1"/>
+                            <field name="approved_at" readonly="1"/>
                         </group>
                     </group>
                     <group col="2">
@@ -94,8 +119,27 @@
                             <field name="reminder_rule_ids" widget="many2many_tags"/>
                         </group>
                     </group>
-                    <group col="1">
-                        <field name="note" nolabel="1" style="width: 100%; min-height: 180px;"/>
+                    <group col="2" string="Pflichtfelder und Freigabe">
+                        <group>
+                            <field name="require_partner"/>
+                            <field name="require_cost_center"/>
+                            <field name="require_dates"/>
+                        </group>
+                        <group>
+                            <field name="require_value"/>
+                            <field name="require_payment_interval"/>
+                            <field name="rejection_reason" readonly="1" invisible="not rejection_reason"/>
+                        </group>
+                    </group>
+                    <group col="1" string="Standardklauseln">
+                        <field name="clause_text" nolabel="1" style="width: 100%; min-height: 180px;"/>
+                    </group>
+                    <group col="1" string="Dokumentenpaket">
+                        <field
+                            name="template_attachment_ids"
+                            widget="many2many_binary"
+                            context="{'default_res_model': 'contract.template', 'default_res_id': id}"
+                        />
                     </group>
                 </sheet>
             </form>

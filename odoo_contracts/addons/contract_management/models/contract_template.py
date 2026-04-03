@@ -1,4 +1,5 @@
 from odoo import fields, models
+from odoo.exceptions import UserError
 
 
 class ContractTemplate(models.Model):
@@ -8,6 +9,18 @@ class ContractTemplate(models.Model):
 
     name = fields.Char(string="Vorlagenname", required=True, translate=True)
     active = fields.Boolean(default=True)
+    approval_state = fields.Selection(
+        [
+            ("draft", "Entwurf"),
+            ("approved", "Freigegeben"),
+            ("rejected", "Abgelehnt"),
+        ],
+        string="Template-Status",
+        default="draft",
+    )
+    approved_by_id = fields.Many2one("res.users", string="Freigegeben von", readonly=True)
+    approved_at = fields.Datetime(string="Freigegeben am", readonly=True)
+    rejection_reason = fields.Text(string="Ablehnungsgrund", readonly=True)
     contract_kind = fields.Selection(
         [
             ("supplier", "Lieferant"),
@@ -55,7 +68,22 @@ class ContractTemplate(models.Model):
     auto_renew = fields.Boolean(string="Automatisch verlängern", default=False)
     renewal_period_months = fields.Integer(string="Verlängerungszeitraum (Monate)", default=12)
     cost_center = fields.Char(string="Kostenstelle")
-    note = fields.Html(string="Vorlagennotizen")
+    clause_text = fields.Html(string="Standardklauseln")
+    require_partner = fields.Boolean(string="Partner verpflichtend", default=True)
+    require_cost_center = fields.Boolean(string="Kostenstelle verpflichtend", default=False)
+    require_dates = fields.Boolean(string="Start- und Enddatum verpflichtend", default=False)
+    require_value = fields.Boolean(string="Vertragswert verpflichtend", default=True)
+    require_payment_interval = fields.Boolean(
+        string="Zahlungsintervall verpflichtend",
+        default=True,
+    )
+    template_attachment_ids = fields.Many2many(
+        "ir.attachment",
+        "contract_template_attachment_rel",
+        "template_id",
+        "attachment_id",
+        string="Dokumentenpaket",
+    )
     reminder_rule_ids = fields.Many2many(
         "contract.reminder.rule",
         "contract_template_reminder_rule_rel",
@@ -64,8 +92,46 @@ class ContractTemplate(models.Model):
         string="Erinnerungen",
     )
 
+    def action_approve_template(self):
+        for rec in self:
+            if not self.env.user.has_group("contract_management.group_contract_manager"):
+                raise UserError("Nur Vertragsmanager duerfen Vorlagen freigeben.")
+            rec.write(
+                {
+                    "approval_state": "approved",
+                    "approved_by_id": self.env.user.id,
+                    "approved_at": fields.Datetime.now(),
+                    "rejection_reason": False,
+                }
+            )
+
+    def action_reject_template(self):
+        for rec in self:
+            if not self.env.user.has_group("contract_management.group_contract_manager"):
+                raise UserError("Nur Vertragsmanager duerfen Vorlagen ablehnen.")
+            rec.write(
+                {
+                    "approval_state": "rejected",
+                    "approved_by_id": False,
+                    "approved_at": False,
+                    "rejection_reason": "Vorlage manuell abgelehnt.",
+                }
+            )
+
+    def action_reset_template_draft(self):
+        self.write(
+            {
+                "approval_state": "draft",
+                "approved_by_id": False,
+                "approved_at": False,
+                "rejection_reason": False,
+            }
+        )
+
     def action_create_contract_from_template(self):
         self.ensure_one()
+        if self.approval_state != "approved":
+            raise UserError("Nur freigegebene Vorlagen duerfen fuer neue Vertraege verwendet werden.")
         context = {
             "default_name": self.name,
             "default_template_id": self.id,
@@ -83,7 +149,7 @@ class ContractTemplate(models.Model):
             "default_auto_renew": self.auto_renew,
             "default_renewal_period_months": self.renewal_period_months,
             "default_cost_center": self.cost_center,
-            "default_note": self.note,
+            "default_note": self.clause_text,
             "default_reminder_rule_ids": [(6, 0, self.reminder_rule_ids.ids)],
         }
         return {

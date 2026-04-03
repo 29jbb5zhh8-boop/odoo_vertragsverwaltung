@@ -250,13 +250,22 @@ class ContractContract(models.Model):
 
     @api.model_create_multi
     def create(self, vals_list):
-        for vals in vals_list:
+        templates = {}
+        for index, vals in enumerate(vals_list):
             if not vals.get("contract_number"):
                 seq = self.env["ir.sequence"].sudo().next_by_code("contract.contract")
                 vals["contract_number"] = seq or "V-00000"
             if not vals.get("responsible_user_id"):
                 vals["responsible_user_id"] = self.env.user.id
-        return super().create(vals_list)
+            template_id = vals.get("template_id") or self.env.context.get("default_template_id")
+            if template_id:
+                templates[index] = self.env["contract.template"].browse(template_id)
+        records = super().create(vals_list)
+        for index, rec in enumerate(records):
+            template = templates.get(index)
+            if template and template.exists():
+                rec._apply_template_package(template)
+        return records
 
     def name_get(self):
         result = []
@@ -297,7 +306,9 @@ class ContractContract(models.Model):
 
     @api.constrains(
         "contract_kind",
+        "template_id",
         "partner_id",
+        "cost_center",
         "contract_value",
         "payment_interval",
         "start_date",
@@ -317,6 +328,10 @@ class ContractContract(models.Model):
         dated_kinds = {"rent", "lease", "maintenance", "service", "license", "insurance"}
         for rec in self:
             errors = []
+            if rec.template_id and rec.template_id.approval_state != "approved":
+                errors.append("Die ausgewaehlte Vorlage ist nicht freigegeben.")
+            if rec.template_id and rec.template_id.contract_kind != rec.contract_kind:
+                errors.append("Vorlage und Vertragsart muessen zueinander passen.")
             if rec.contract_kind != "other" and not rec.partner_id:
                 errors.append("Vertragspartner ist fuer diese Vertragsart verpflichtend.")
             if rec.contract_kind in value_required_kinds and not rec.contract_value:
@@ -327,8 +342,64 @@ class ContractContract(models.Model):
                 errors.append("Startdatum ist fuer diese Vertragsart verpflichtend.")
             if rec.contract_kind in dated_kinds and not rec.end_date:
                 errors.append("Enddatum ist fuer diese Vertragsart verpflichtend.")
+            if rec.template_id:
+                if rec.template_id.require_partner and not rec.partner_id:
+                    errors.append("Die Vorlage verlangt einen Vertragspartner.")
+                if rec.template_id.require_cost_center and not rec.cost_center:
+                    errors.append("Die Vorlage verlangt eine Kostenstelle.")
+                if rec.template_id.require_dates and (not rec.start_date or not rec.end_date):
+                    errors.append("Die Vorlage verlangt Start- und Enddatum.")
+                if rec.template_id.require_value and not rec.contract_value:
+                    errors.append("Die Vorlage verlangt einen Vertragswert.")
+                if rec.template_id.require_payment_interval and not rec.payment_interval:
+                    errors.append("Die Vorlage verlangt ein Zahlungsintervall.")
             if errors:
                 raise ValidationError("\n".join(errors))
+
+    def _apply_template_package(self, template):
+        self.ensure_one()
+        if not template.template_attachment_ids:
+            return
+        copied_attachments = self.env["ir.attachment"]
+        for attachment in template.template_attachment_ids:
+            if not attachment.datas:
+                continue
+            copied_attachments |= self.env["ir.attachment"].create(
+                {
+                    "name": attachment.name,
+                    "type": "binary",
+                    "datas": attachment.datas,
+                    "mimetype": attachment.mimetype,
+                    "res_model": "contract.contract",
+                    "res_id": self.id,
+                }
+            )
+        if copied_attachments:
+            primary_attachment = copied_attachments[:1]
+            self.write(
+                {
+                    "attachment_ids": [(4, attachment.id) for attachment in copied_attachments],
+                }
+            )
+            (copied_attachments - primary_attachment).write(
+                {
+                    "show_in_contract": False,
+                    "is_current": False,
+                }
+            )
+            primary_attachment.write(
+                {
+                    "show_in_contract": True,
+                    "is_current": True,
+                }
+            )
+
+    def _send_mail_template(self, xmlid):
+        template = self.env.ref(xmlid, raise_if_not_found=False)
+        if not template:
+            return
+        for rec in self:
+            template.send_mail(rec.id, force_send=False)
 
     def _get_manager_approval_threshold(self):
         value = (
@@ -544,6 +615,44 @@ class ContractContract(models.Model):
                 }
             )
 
+    def _cron_escalate_pending_approvals(self):
+        delay_days = int(
+            self.env["ir.config_parameter"]
+            .sudo()
+            .get_param("contract_management.approval_escalation_days", "3")
+        )
+        deadline = fields.Datetime.subtract(fields.Datetime.now(), days=delay_days)
+        contracts = self.search(
+            [
+                ("approval_state", "in", ["pending", "pending_manager"]),
+                ("submitted_for_approval_at", "!=", False),
+                ("submitted_for_approval_at", "<=", deadline),
+            ]
+        )
+        for contract in contracts:
+            if contract.approval_state == "pending_manager":
+                contract._send_mail_template("contract_management.mail_template_contract_escalation_manager")
+                approver_name = (
+                    contract.manager_approval_user_id.display_name
+                    if contract.manager_approval_user_id
+                    else "Manager"
+                )
+            else:
+                contract._send_mail_template("contract_management.mail_template_contract_escalation_approver")
+                approver_name = (
+                    contract.approval_user_id.display_name
+                    if contract.approval_user_id
+                    else "Freigeber"
+                )
+            self.env["contract.timeline"].sudo().create(
+                {
+                    "contract_id": contract.id,
+                    "event_type": "reminder",
+                    "message": f"Freigabe eskaliert an {approver_name}",
+                    "user_id": self.env.user.id,
+                }
+            )
+
     def action_submit_for_approval(self):
         for rec in self:
             if rec.approval_state not in ("draft", "rejected"):
@@ -572,6 +681,7 @@ class ContractContract(models.Model):
                 }
             )
             rec._create_approval_activity()
+            rec._send_mail_template("contract_management.mail_template_contract_submitted")
             rec.message_post(
                 body=f"Vertrag zur Freigabe eingereicht an {rec.approval_user_id.display_name}."
             )
@@ -647,6 +757,7 @@ class ContractContract(models.Model):
                     rec.write(values)
                     rec._close_approval_activities(feedback=feedback)
                     rec._create_approval_activity(stage="manager")
+                    rec._send_mail_template("contract_management.mail_template_contract_manager_stage")
                 else:
                     values.update(
                         {
@@ -675,6 +786,7 @@ class ContractContract(models.Model):
                     message = "Vertrag freigegeben"
                     rec.write(values)
                     rec._close_approval_activities(feedback=feedback)
+                    rec._send_mail_template("contract_management.mail_template_contract_approved")
             elif decision == "reject":
                 values.update(
                     {
@@ -702,6 +814,7 @@ class ContractContract(models.Model):
                 message = f"Vertrag abgelehnt: {clean_comment}"
                 rec.write(values)
                 rec._close_approval_activities(feedback=feedback)
+                rec._send_mail_template("contract_management.mail_template_contract_rejected")
             else:
                 raise UserError("Unbekannte Freigabeentscheidung.")
             rec.message_post(body=message)

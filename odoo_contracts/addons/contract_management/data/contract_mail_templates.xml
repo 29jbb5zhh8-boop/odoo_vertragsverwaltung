@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="mail_template_contract_submitted" model="mail.template">
+        <field name="name">Contract Submitted for Approval</field>
+        <field name="model_id" ref="model_contract_contract"/>
+        <field name="subject">Vertrag ${object.display_name} wartet auf Freigabe</field>
+        <field name="email_to">${object.approval_user_id.partner_id.email or object.approval_user_id.email or ''}</field>
+        <field name="body_html" type="html">
+            <div>
+                <p>ein Vertrag wurde zur Freigabe eingereicht und wartet auf Ihre Bearbeitung.</p>
+                <p><strong>${object.display_name}</strong></p>
+                <p>Partner: ${object.partner_id.display_name or '-'}</p>
+                <p>Vertragswert: ${format_amount(object.contract_value, object.currency_id) if object.contract_value else '-'}</p>
+                <p>Vertragsart: ${object.contract_kind or '-'}</p>
+                <p>Bitte pruefen Sie den Vertrag im System und treffen Sie Ihre Entscheidung.</p>
+            </div>
+        </field>
+    </record>
+
+    <record id="mail_template_contract_manager_stage" model="mail.template">
+        <field name="name">Contract Submitted to Manager Approval</field>
+        <field name="model_id" ref="model_contract_contract"/>
+        <field name="subject">Manager-Freigabe fuer ${object.display_name} erforderlich</field>
+        <field name="email_to">${object.manager_approval_user_id.partner_id.email or object.manager_approval_user_id.email or ''}</field>
+        <field name="body_html" type="html">
+            <div>
+                <p>ein Vertrag hat die erste Freigabestufe erfolgreich durchlaufen und wartet nun auf Ihre Manager-Freigabe.</p>
+                <p><strong>${object.display_name}</strong></p>
+                <p>Partner: ${object.partner_id.display_name or '-'}</p>
+                <p>Vertragswert: ${format_amount(object.contract_value, object.currency_id) if object.contract_value else '-'}</p>
+                <p>Kommentar Vorpruefung: ${object.approval_comment or '-'}</p>
+            </div>
+        </field>
+    </record>
+
+    <record id="mail_template_contract_approved" model="mail.template">
+        <field name="name">Contract Approved</field>
+        <field name="model_id" ref="model_contract_contract"/>
+        <field name="subject">Vertrag ${object.display_name} wurde freigegeben</field>
+        <field name="email_to">${object.responsible_user_id.partner_id.email or object.responsible_user_id.email or object.create_uid.partner_id.email or object.create_uid.email or ''}</field>
+        <field name="body_html" type="html">
+            <div>
+                <p>der Vertrag wurde erfolgreich freigegeben.</p>
+                <p><strong>${object.display_name}</strong></p>
+                <p>Status: ${object.state or '-'}</p>
+                <p>Kommentar: ${object.manager_approval_comment or object.approval_comment or '-'}</p>
+            </div>
+        </field>
+    </record>
+
+    <record id="mail_template_contract_rejected" model="mail.template">
+        <field name="name">Contract Rejected</field>
+        <field name="model_id" ref="model_contract_contract"/>
+        <field name="subject">Vertrag ${object.display_name} wurde abgelehnt</field>
+        <field name="email_to">${object.responsible_user_id.partner_id.email or object.responsible_user_id.email or object.create_uid.partner_id.email or object.create_uid.email or ''}</field>
+        <field name="body_html" type="html">
+            <div>
+                <p>der Vertrag wurde im aktuellen Freigabeschritt abgelehnt.</p>
+                <p><strong>${object.display_name}</strong></p>
+                <p>Ablehnungsgrund: ${object.rejection_reason or '-'}</p>
+                <p>Bitte passen Sie den Vertrag an und reichen Sie ihn bei Bedarf erneut ein.</p>
+            </div>
+        </field>
+    </record>
+
+    <record id="mail_template_contract_escalation_approver" model="mail.template">
+        <field name="name">Contract Approval Escalation Approver</field>
+        <field name="model_id" ref="model_contract_contract"/>
+        <field name="subject">Eskalation: Freigabe fuer ${object.display_name} ueberfaellig</field>
+        <field name="email_to">${object.approval_user_id.partner_id.email or object.approval_user_id.email or ''}</field>
+        <field name="body_html" type="html">
+            <div>
+                <p>die Freigabe dieses Vertrags ist ueberfaellig.</p>
+                <p><strong>${object.display_name}</strong></p>
+                <p>Eingereicht am: ${format_datetime(object.submitted_for_approval_at) if object.submitted_for_approval_at else '-'}</p>
+                <p>Bitte pruefen Sie den Vertrag zeitnah.</p>
+            </div>
+        </field>
+    </record>
+
+    <record id="mail_template_contract_escalation_manager" model="mail.template">
+        <field name="name">Contract Approval Escalation Manager</field>
+        <field name="model_id" ref="model_contract_contract"/>
+        <field name="subject">Eskalation: Manager-Freigabe fuer ${object.display_name} ueberfaellig</field>
+        <field name="email_to">${object.manager_approval_user_id.partner_id.email or object.manager_approval_user_id.email or ''}</field>
+        <field name="body_html" type="html">
+            <div>
+                <p>die Manager-Freigabe dieses Vertrags ist ueberfaellig.</p>
+                <p><strong>${object.display_name}</strong></p>
+                <p>Eingereicht am: ${format_datetime(object.submitted_for_approval_at) if object.submitted_for_approval_at else '-'}</p>
+                <p>Bitte pruefen Sie den Vertrag zeitnah.</p>
+            </div>
+        </field>
+    </record>
+</odoo>
