@@ -158,6 +158,19 @@ class ContractContract(models.Model):
         string="Freigegeben am",
         readonly=True,
     )
+    approval_comment = fields.Text(
+        string="Freigabekommentar",
+        readonly=True,
+    )
+    rejection_reason = fields.Text(
+        string="Ablehnungsgrund",
+        readonly=True,
+    )
+    approval_decided_by_id = fields.Many2one(
+        "res.users",
+        string="Freigabe entschieden von",
+        readonly=True,
+    )
     note = fields.Html(string="Notizen")
     fulltext = fields.Text(string="Volltext", compute="_compute_fulltext", store=True, index=True)
 
@@ -333,6 +346,9 @@ class ContractContract(models.Model):
                 "approval_state": "draft",
                 "submitted_for_approval_at": False,
                 "approved_at": False,
+                "approval_comment": False,
+                "rejection_reason": False,
+                "approval_decided_by_id": False,
             }
         )
 
@@ -343,19 +359,66 @@ class ContractContract(models.Model):
         if self.approval_user_id != self.env.user:
             raise UserError("Nur der zugewiesene Freigeber oder ein Vertragsmanager darf freigeben.")
 
+    def _get_approval_activity_type(self):
+        return self.env.ref("mail.mail_activity_data_todo", raise_if_not_found=False)
+
+    def _close_approval_activities(self, feedback=None):
+        activity_type = self._get_approval_activity_type()
+        for rec in self:
+            domain = [
+                ("res_model", "=", "contract.contract"),
+                ("res_id", "=", rec.id),
+            ]
+            if activity_type:
+                domain.append(("activity_type_id", "=", activity_type.id))
+            activities = self.env["mail.activity"].sudo().search(domain)
+            if not activities:
+                continue
+            if hasattr(activities, "action_feedback"):
+                activities.action_feedback(feedback=feedback or "")
+            else:
+                activities.unlink()
+
+    def _create_approval_activity(self):
+        activity_type = self._get_approval_activity_type()
+        if not activity_type:
+            return
+        model_id = self.env["ir.model"]._get_id("contract.contract")
+        for rec in self:
+            if not rec.approval_user_id:
+                continue
+            self.env["mail.activity"].sudo().create(
+                {
+                    "activity_type_id": activity_type.id,
+                    "summary": "Vertrag zur Freigabe pruefen",
+                    "note": (
+                        f"Bitte Vertrag {rec.display_name} pruefen und freigeben oder ablehnen."
+                    ),
+                    "date_deadline": fields.Date.context_today(rec),
+                    "res_model_id": model_id,
+                    "res_id": rec.id,
+                    "user_id": rec.approval_user_id.id,
+                }
+            )
+
     def action_submit_for_approval(self):
         for rec in self:
             if rec.approval_state not in ("draft", "rejected"):
                 raise UserError("Nur Entwuerfe oder abgelehnte Vertraege koennen eingereicht werden.")
             if not rec.approval_user_id:
                 raise UserError("Bitte zuerst einen Freigeber hinterlegen.")
+            rec._close_approval_activities()
             rec.write(
                 {
                     "approval_state": "pending",
                     "submitted_for_approval_at": fields.Datetime.now(),
                     "approved_at": False,
+                    "approval_comment": False,
+                    "rejection_reason": False,
+                    "approval_decided_by_id": False,
                 }
             )
+            rec._create_approval_activity()
             rec.message_post(
                 body=f"Vertrag zur Freigabe eingereicht an {rec.approval_user_id.display_name}."
             )
@@ -368,44 +431,83 @@ class ContractContract(models.Model):
                 }
             )
 
-    def action_approve(self):
-        for rec in self:
-            if rec.approval_state != "pending":
-                raise UserError("Nur Vertraege im Status 'Zur Freigabe' koennen freigegeben werden.")
-            rec._check_can_approve()
-            rec.write(
-                {
-                    "approval_state": "approved",
-                    "approved_at": fields.Datetime.now(),
-                }
-            )
-            rec.message_post(body="Vertrag freigegeben.")
-            self.env["contract.timeline"].create(
-                {
-                    "contract_id": rec.id,
-                    "event_type": "status",
-                    "message": "Vertrag freigegeben",
-                    "user_id": self.env.user.id,
-                }
-            )
+    def action_open_approve_wizard(self):
+        self.ensure_one()
+        self._check_can_approve()
+        if self.approval_state != "pending":
+            raise UserError("Nur Vertraege im Status 'Zur Freigabe' koennen freigegeben werden.")
+        return {
+            "type": "ir.actions.act_window",
+            "name": "Vertrag freigeben",
+            "res_model": "contract.approval.wizard",
+            "view_mode": "form",
+            "target": "new",
+            "context": {
+                "default_contract_id": self.id,
+                "default_decision": "approve",
+            },
+        }
 
-    def action_reject(self):
+    def action_open_reject_wizard(self):
+        self.ensure_one()
+        self._check_can_approve()
+        if self.approval_state != "pending":
+            raise UserError("Nur Vertraege im Status 'Zur Freigabe' koennen abgelehnt werden.")
+        return {
+            "type": "ir.actions.act_window",
+            "name": "Vertrag ablehnen",
+            "res_model": "contract.approval.wizard",
+            "view_mode": "form",
+            "target": "new",
+            "context": {
+                "default_contract_id": self.id,
+                "default_decision": "reject",
+            },
+        }
+
+    def action_apply_approval_decision(self, decision, comment=False):
         for rec in self:
             if rec.approval_state != "pending":
-                raise UserError("Nur Vertraege im Status 'Zur Freigabe' koennen abgelehnt werden.")
+                raise UserError("Nur Vertraege im Status 'Zur Freigabe' koennen bearbeitet werden.")
             rec._check_can_approve()
-            rec.write(
-                {
-                    "approval_state": "rejected",
-                    "approved_at": False,
-                }
-            )
-            rec.message_post(body="Vertrag abgelehnt.")
+            clean_comment = (comment or "").strip()
+            if decision == "reject" and not clean_comment:
+                raise UserError("Bei einer Ablehnung ist ein Kommentar verpflichtend.")
+            values = {
+                "approval_decided_by_id": self.env.user.id,
+            }
+            if decision == "approve":
+                values.update(
+                    {
+                        "approval_state": "approved",
+                        "approved_at": fields.Datetime.now(),
+                        "approval_comment": clean_comment or False,
+                        "rejection_reason": False,
+                    }
+                )
+                feedback = clean_comment or "Vertrag freigegeben."
+                message = "Vertrag freigegeben"
+            elif decision == "reject":
+                values.update(
+                    {
+                        "approval_state": "rejected",
+                        "approved_at": False,
+                        "approval_comment": False,
+                        "rejection_reason": clean_comment,
+                    }
+                )
+                feedback = clean_comment
+                message = f"Vertrag abgelehnt: {clean_comment}"
+            else:
+                raise UserError("Unbekannte Freigabeentscheidung.")
+            rec.write(values)
+            rec._close_approval_activities(feedback=feedback)
+            rec.message_post(body=message)
             self.env["contract.timeline"].create(
                 {
                     "contract_id": rec.id,
                     "event_type": "status",
-                    "message": "Vertrag abgelehnt",
+                    "message": message,
                     "user_id": self.env.user.id,
                 }
             )

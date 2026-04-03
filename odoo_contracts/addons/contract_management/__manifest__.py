@@ -31,6 +31,7 @@
         "views/ocr_log_views.xml",
         "views/ocr_viewer_wizard.xml",
         "views/contract_cancel_wizard.xml",
+        "views/contract_approval_wizard.xml",
         "views/contract_views.xml",
         "views/report_contract.xml",
         "views/config_views.xml",

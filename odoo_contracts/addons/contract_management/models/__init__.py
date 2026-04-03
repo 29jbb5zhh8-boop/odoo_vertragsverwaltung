@@ -5,6 +5,7 @@ from . import contract_type
 from . import contract_reminder_rule
 from . import contract_reminder_sent
 from . import contract_cancel_wizard
+from . import contract_approval_wizard
 from . import contract_timeline
 from . import attachment_rename_wizard
 
