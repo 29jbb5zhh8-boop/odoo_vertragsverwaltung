@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <menuitem id="menu_contract_root" name="Verträge" sequence="10" action="action_contract_contract"/>
+    <menuitem id="menu_contract_contracts" name="Verträge" parent="menu_contract_root" action="action_contract_contract" sequence="10"/>
+    <menuitem id="menu_contract_config" name="Konfiguration" parent="menu_contract_root" sequence="100" groups="contract_management.group_contract_manager"/>
+    <menuitem id="menu_contract_types" name="Vertragstypen" parent="menu_contract_config" action="action_contract_type" sequence="10" groups="contract_management.group_contract_manager"/>
+    <menuitem id="menu_contract_categories" name="Vertragskategorien" parent="menu_contract_config" action="action_contract_category" sequence="15" groups="contract_management.group_contract_manager"/>
+    <menuitem id="menu_contract_reminders" name="Erinnerungen" parent="menu_contract_config" action="action_contract_reminder_rule" sequence="20" groups="contract_management.group_contract_manager"/>
+    <menuitem id="menu_contract_attachments" name="Anhänge (OCR)" parent="menu_contract_config" action="action_contract_attachments" sequence="30" groups="contract_management.group_contract_manager"/>
+    <menuitem id="menu_contract_ocr_log" name="OCR Protokoll" parent="menu_contract_config" action="action_contract_ocr_log" sequence="40" groups="contract_management.group_contract_manager"/>
+</odoo>

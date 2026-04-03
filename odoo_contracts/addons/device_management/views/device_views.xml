@@ -1,0 +1,180 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_device_device_list" model="ir.ui.view">
+        <field name="name">device.device.list</field>
+        <field name="model">device.device</field>
+        <field name="arch" type="xml">
+            <list string="Assets">
+                <field name="asset_tag"/>
+                <field name="name"/>
+                <field name="partner_id"/>
+                <field name="site_id"/>
+                <field name="asset_type_id"/>
+                <field name="serial_number"/>
+                <field name="state"/>
+                <field name="warranty_end"/>
+                <field name="active"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_device_device_form" model="ir.ui.view">
+        <field name="name">device.device.form</field>
+        <field name="model">device.device</field>
+        <field name="arch" type="xml">
+            <form string="Asset">
+                <sheet>
+                    <div class="oe_title">
+                        <h1>
+                            <field name="name" placeholder="Asset-Name"/>
+                        </h1>
+                    </div>
+                    <group>
+                        <group>
+                            <field name="asset_tag"/>
+                            <field name="asset_reference"/>
+                            <field name="partner_id"/>
+                            <field name="site_id" context="{'default_parent_id': partner_id}"/>
+                            <field name="asset_type_id"/>
+                            <field name="state" widget="statusbar" statusbar_visible="in_use,stock,broken,retired"/>
+                        </group>
+                        <group>
+                            <field name="serial_number"/>
+                            <field name="manufacturer"/>
+                            <field name="model"/>
+                            <field name="active"/>
+                            <field name="image_1920" widget="image" class="oe_avatar"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Vertrag/Garantie">
+                            <group>
+                                <group>
+                                    <field name="purchase_date"/>
+                                    <field name="warranty_end"/>
+                                </group>
+                                <group>
+                                    <field name="vendor_id"/>
+                                </group>
+                            </group>
+                        </page>
+                        <page string="Netzwerk/OS">
+                            <group>
+                                <group>
+                                    <field name="hostname"/>
+                                    <field name="ip_address"/>
+                                    <field name="mac_address"/>
+                                </group>
+                                <group>
+                                    <field name="os_name"/>
+                                    <field name="os_version"/>
+                                    <field name="firmware_version"/>
+                                </group>
+                            </group>
+                        </page>
+                        <page string="Beziehungen">
+                            <field name="related_device_ids" domain="[('id', '!=', id)]">
+                                <list editable="bottom">
+                                    <field name="asset_tag"/>
+                                    <field name="name"/>
+                                    <field name="partner_id"/>
+                                    <field name="site_id"/>
+                                    <field name="asset_type_id"/>
+                                    <field name="serial_number"/>
+                                    <field name="state"/>
+                                </list>
+                            </field>
+                        </page>
+                        <page string="Dokumente">
+                            <field name="attachment_ids" widget="many2many_binary"/>
+                        </page>
+                        <page string="Notizen">
+                            <field name="note"/>
+                        </page>
+                    </notebook>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_device_device_search" model="ir.ui.view">
+        <field name="name">device.device.search</field>
+        <field name="model">device.device</field>
+        <field name="arch" type="xml">
+            <search string="Assets">
+                <field name="asset_tag"/>
+                <field name="name"/>
+                <field name="partner_id"/>
+                <field name="site_id"/>
+                <field name="asset_type_id"/>
+                <field name="serial_number"/>
+                <field name="state"/>
+                <filter name="active" string="Aktiv" domain="[('active', '=', True)]"/>
+                <filter name="archived" string="Archiviert" domain="[('active', '=', False)]"/>
+                <filter name="warranty_90" string="Garantie &lt;= 90 Tage" domain="[('warranty_end', '&lt;=', (context_today() + relativedelta(days=90)))]"/>
+                <group expand="0" string="Gruppieren nach">
+                    <filter name="group_partner" string="Kunde" context="{'group_by': 'partner_id'}"/>
+                    <filter name="group_site" string="Standort" context="{'group_by': 'site_id'}"/>
+                    <filter name="group_type" string="Asset-Typ" context="{'group_by': 'asset_type_id'}"/>
+                    <filter name="group_state" string="Status" context="{'group_by': 'state'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_device_device" model="ir.actions.act_window">
+        <field name="name">Assets</field>
+        <field name="res_model">device.device</field>
+        <field name="view_mode">list,form</field>
+        <field name="help" type="html">
+            <p>Erfasse und verwalte Assets.</p>
+        </field>
+    </record>
+
+    <record id="view_device_type_list" model="ir.ui.view">
+        <field name="name">device.type.list</field>
+        <field name="model">device.type</field>
+        <field name="arch" type="xml">
+            <list string="Asset-Typen">
+                <field name="sequence"/>
+                <field name="name"/>
+                <field name="active"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_device_type_form" model="ir.ui.view">
+        <field name="name">device.type.form</field>
+        <field name="model">device.type</field>
+        <field name="arch" type="xml">
+            <form string="Asset-Typ">
+                <sheet>
+                    <group>
+                        <group>
+                            <field name="name"/>
+                            <field name="sequence"/>
+                            <field name="active"/>
+                        </group>
+                        <group>
+                            <field name="image_1920" widget="image" class="oe_avatar"/>
+                        </group>
+                    </group>
+                    <group>
+                        <field name="description"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_device_type" model="ir.actions.act_window">
+        <field name="name">Asset-Typen</field>
+        <field name="res_model">device.type</field>
+        <field name="view_mode">list,form</field>
+    </record>
+
+    <menuitem id="menu_device_root" name="Assetverwaltung" sequence="10"/>
+    <menuitem id="menu_device_device" name="Assets" parent="menu_device_root" action="action_device_device" sequence="10"/>
+    <menuitem id="menu_device_type" name="Asset-Typen" parent="menu_device_root" action="action_device_type" sequence="20"/>
+</odoo>

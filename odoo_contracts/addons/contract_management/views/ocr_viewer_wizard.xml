@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_contract_ocr_viewer_wizard_form" model="ir.ui.view">
+        <field name="name">contract.ocr.viewer.wizard.form</field>
+        <field name="model">contract.ocr.viewer.wizard</field>
+        <field name="arch" type="xml">
+            <form string="OCR Ergebnis">
+                <sheet>
+                    <group>
+                        <field name="ocr_text" readonly="1" nolabel="1" widget="text" style="min-height: 300px; width: 100%;"/>
+                    </group>
+                </sheet>
+                <footer>
+                    <button string="Schließen" class="btn-secondary" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+</odoo>

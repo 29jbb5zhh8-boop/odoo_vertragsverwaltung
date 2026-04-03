@@ -1,0 +1,102 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_contract_type_tree" model="ir.ui.view">
+        <field name="name">contract.type.tree</field>
+        <field name="model">contract.type</field>
+        <field name="arch" type="xml">
+            <list string="Vertragstypen">
+                <field name="name"/>
+                <field name="active"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_contract_type_form" model="ir.ui.view">
+        <field name="name">contract.type.form</field>
+        <field name="model">contract.type</field>
+        <field name="arch" type="xml">
+            <form string="Vertragstyp">
+                <sheet>
+                    <group>
+                        <field name="name"/>
+                        <field name="active"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_contract_type" model="ir.actions.act_window">
+        <field name="name">Vertragstypen</field>
+        <field name="res_model">contract.type</field>
+        <field name="view_mode">list,form</field>
+    </record>
+
+    <record id="view_contract_reminder_rule_tree" model="ir.ui.view">
+        <field name="name">contract.reminder.rule.tree</field>
+        <field name="model">contract.reminder.rule</field>
+        <field name="arch" type="xml">
+            <list string="Erinnerungen">
+                <field name="name"/>
+                <field name="days_before"/>
+                <field name="active"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_contract_reminder_rule_form" model="ir.ui.view">
+        <field name="name">contract.reminder.rule.form</field>
+        <field name="model">contract.reminder.rule</field>
+        <field name="arch" type="xml">
+            <form string="Erinnerung">
+                <sheet>
+                    <group>
+                        <field name="name"/>
+                        <field name="days_before"/>
+                        <field name="active"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_contract_reminder_rule" model="ir.actions.act_window">
+        <field name="name">Erinnerungen</field>
+        <field name="res_model">contract.reminder.rule</field>
+        <field name="view_mode">list,form</field>
+    </record>
+
+    <record id="view_contract_category_tree" model="ir.ui.view">
+        <field name="name">contract.category.tree</field>
+        <field name="model">contract.category</field>
+        <field name="arch" type="xml">
+            <list string="Vertragskategorien">
+                <field name="name"/>
+                <field name="active"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_contract_category_form" model="ir.ui.view">
+        <field name="name">contract.category.form</field>
+        <field name="model">contract.category</field>
+        <field name="arch" type="xml">
+            <form string="Vertragskategorie">
+                <sheet>
+                    <group>
+                        <field name="name"/>
+                        <field name="active"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_contract_category" model="ir.actions.act_window">
+        <field name="name">Vertragskategorien</field>
+        <field name="res_model">contract.category</field>
+        <field name="view_mode">list,form</field>
+    </record>
+
+    <!-- OCR settings removed -->
+</odoo>

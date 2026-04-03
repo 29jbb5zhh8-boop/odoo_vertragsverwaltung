@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_contract_cancel_wizard_form" model="ir.ui.view">
+        <field name="name">contract.cancel.wizard.form</field>
+        <field name="model">contract.cancel.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Vertrag kündigen">
+                <group>
+                    <field name="contract_id" readonly="1" invisible="1"/>
+                    <field name="reason" placeholder="Bitte Kündigungsgrund angeben..."/>
+                </group>
+                <footer>
+                    <button name="action_confirm_cancel" type="object" string="Kündigen" class="btn-primary"/>
+                    <button string="Abbrechen" special="cancel" class="btn-secondary"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_contract_cancel_wizard" model="ir.actions.act_window">
+        <field name="name">Vertrag kündigen</field>
+        <field name="res_model">contract.cancel.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+        <field name="context">{'default_contract_id': active_id}</field>
+    </record>
+</odoo>

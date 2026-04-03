@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="action_report_device_label" model="ir.actions.report">
+        <field name="name">Asset-Label</field>
+        <field name="model">device.device</field>
+        <field name="report_type">qweb-pdf</field>
+        <field name="report_name">device_management.report_device_label</field>
+        <field name="report_file">device_management.report_device_label</field>
+        <field name="print_report_name">'Asset-Label - %s' % (object.asset_tag or object.name)</field>
+    </record>
+
+    <template id="report_device_label">
+        <t t-call="web.basic_layout">
+            <t t-foreach="docs" t-as="doc">
+                <div class="page">
+                    <div class="row">
+                        <div class="col-6">
+                            <h2>
+                                <t t-esc="doc.name"/>
+                            </h2>
+                            <p>
+                                <strong>Asset-ID:</strong>
+                                <t t-esc="doc.asset_tag or ''"/>
+                            </p>
+                            <p>
+                                <strong>Referenz:</strong>
+                                <t t-esc="doc.asset_reference or ''"/>
+                            </p>
+                            <p>
+                                <strong>Seriennummer:</strong>
+                                <t t-esc="doc.serial_number or ''"/>
+                            </p>
+                            <p>
+                                <strong>Kunde:</strong>
+                                <t t-esc="doc.partner_id.display_name or ''"/>
+                            </p>
+                        </div>
+                        <div class="col-6" style="text-align: right;">
+                            <t t-set="qr_value" t-value="doc.asset_tag or str(doc.id)"/>
+                            <img t-att-src="'/report/barcode/QR/%s' % qr_value" style="width: 140px; height: 140px;"/>
+                        </div>
+                    </div>
+                </div>
+            </t>
+        </t>
+    </template>
+</odoo>

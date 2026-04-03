@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_contract_timeline_kanban" model="ir.ui.view">
+        <field name="name">contract.timeline.kanban</field>
+        <field name="model">contract.timeline</field>
+        <field name="arch" type="xml">
+            <kanban class="o_kanban_small_column" create="false" delete="false">
+                <field name="event_date"/>
+                <field name="event_type"/>
+                <field name="message"/>
+                <field name="user_id"/>
+                <templates>
+                    <t t-name="kanban-box">
+                        <div class="o_kanban_record">
+                            <div class="o_kanban_record_top">
+                                <div class="o_kanban_record_headings">
+                                    <strong><t t-esc="record.event_type.value"/></strong>
+                                </div>
+                                <div class="text-muted">
+                                    <t t-esc="record.event_date.value"/>
+                                </div>
+                            </div>
+                            <div class="o_kanban_record_body">
+                                <div><t t-esc="record.message.value"/></div>
+                            </div>
+                            <div class="o_kanban_record_bottom">
+                                <div class="text-muted">
+                                    <t t-esc="record.user_id.value"/>
+                                </div>
+                            </div>
+                        </div>
+                    </t>
+                </templates>
+            </kanban>
+        </field>
+    </record>
+</odoo>

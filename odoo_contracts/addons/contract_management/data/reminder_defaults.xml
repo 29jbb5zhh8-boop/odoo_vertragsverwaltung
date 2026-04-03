@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="contract_reminder_365" model="contract.reminder.rule">
+        <field name="name">365 Tage</field>
+        <field name="days_before">365</field>
+        <field name="active">True</field>
+    </record>
+    <record id="contract_reminder_90" model="contract.reminder.rule">
+        <field name="name">90 Tage</field>
+        <field name="days_before">90</field>
+        <field name="active">True</field>
+    </record>
+    <record id="contract_reminder_30" model="contract.reminder.rule">
+        <field name="name">30 Tage</field>
+        <field name="days_before">30</field>
+        <field name="active">True</field>
+    </record>
+</odoo>

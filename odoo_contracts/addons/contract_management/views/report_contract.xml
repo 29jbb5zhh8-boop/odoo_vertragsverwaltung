@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <template id="report_contract_document">
+        <t t-call="web.html_container">
+            <t t-foreach="docs" t-as="o">
+                <t t-call="web.external_layout">
+                    <div class="page">
+                        <h2>Vertrag</h2>
+
+                        <h3>Stammdaten</h3>
+                        <table class="table table-sm">
+                            <tbody>
+                                <tr><th>Vertragstitel</th><td><span t-esc="o.name"/></td></tr>
+                                <tr><th>Status</th><td><span t-esc="o.state"/></td></tr>
+                                <tr><th>Vertragspartner</th><td><span t-esc="o.partner_id.display_name"/></td></tr>
+                                <tr><th>Verantwortlich</th><td><span t-esc="o.responsible_user_id.display_name"/></td></tr>
+                            </tbody>
+                        </table>
+
+                        <h3>Klassifikation</h3>
+                        <table class="table table-sm">
+                            <tbody>
+                                <tr><th>Vertragskategorie</th><td><span t-esc="o.category_id.display_name"/></td></tr>
+                                <tr><th>Vertragstyp</th><td><span t-esc="o.type_id.display_name"/></td></tr>
+                                <tr><th>Interne Abteilung</th><td><span t-esc="o.department_id.display_name"/></td></tr>
+                            </tbody>
+                        </table>
+
+                        <h3>Laufzeit &amp; Kündigung</h3>
+                        <table class="table table-sm">
+                            <tbody>
+                                <tr><th>Startdatum</th><td><span t-esc="o.start_date and o.start_date.strftime('%d.%m.%Y') or ''"/></td></tr>
+                                <tr><th>Enddatum</th><td><span t-esc="o.end_date and o.end_date.strftime('%d.%m.%Y') or ''"/></td></tr>
+                                <tr><th>Kündigungsfrist (Monate)</th><td><span t-esc="o.termination_notice_months"/></td></tr>
+                                <tr><th>Frühest. kündbar ab</th><td><span t-esc="o.earliest_termination_date and o.earliest_termination_date.strftime('%d.%m.%Y') or ''"/></td></tr>
+                            </tbody>
+                        </table>
+
+                        <h3>Verlängerung</h3>
+                        <table class="table table-sm">
+                            <tbody>
+                                <tr><th>Automatisch verlängern</th><td><span t-esc="'Ja' if o.auto_renew else 'Nein'"/></td></tr>
+                                <tr><th>Verlängerungszeitraum (Monate)</th><td><span t-esc="o.renewal_period_months"/></td></tr>
+                                <tr><th>Nächstes Enddatum</th><td><span t-esc="o.next_end_date and o.next_end_date.strftime('%d.%m.%Y') or ''"/></td></tr>
+                            </tbody>
+                        </table>
+
+                        <t t-if="o.note">
+                            <h3>Notizen</h3>
+                            <div t-field="o.note"/>
+                        </t>
+
+                        <h3>Aktuelle Anhänge</h3>
+                        <t t-set="attachments" t-value="o.attachment_ids.filtered(lambda a: a.show_in_contract)"/>
+                        <t t-if="attachments">
+                            <ul>
+                                <t t-foreach="attachments" t-as="att">
+                                    <li>
+                                        <span t-esc="att.name"/> (<span t-esc="att.version_label"/>)
+                                    </li>
+                                </t>
+                            </ul>
+                        </t>
+                        <t t-else="">
+                            <p>Keine Anhänge.</p>
+                        </t>
+                    </div>
+                </t>
+            </t>
+        </t>
+    </template>
+</odoo>

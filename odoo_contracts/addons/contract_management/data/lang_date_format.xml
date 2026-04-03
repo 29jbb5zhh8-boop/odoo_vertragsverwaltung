@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="base.lang_de_DE" model="res.lang">
+        <field name="date_format">%d.%m.%Y</field>
+    </record>
+    <record id="base.lang_en_US" model="res.lang">
+        <field name="date_format">%m/%d/%Y</field>
+    </record>
+</odoo>

@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_contract_ocr_log_tree" model="ir.ui.view">
+        <field name="name">contract.ocr.log.tree</field>
+        <field name="model">contract.ocr.log</field>
+        <field name="arch" type="xml">
+            <list string="OCR Protokoll">
+                <field name="contract_id"/>
+                <field name="attachment_id"/>
+                <field name="ocr_state" widget="badge"
+                       decoration-success="ocr_state == 'done'"
+                       decoration-warning="ocr_state == 'pending'"
+                       decoration-danger="ocr_state == 'error'"
+                       decoration-muted="ocr_state == 'none'"/>
+                <field name="ocr_error" optional="hide"/>
+                <field name="create_date" string="Zeitpunkt"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_contract_ocr_log_search" model="ir.ui.view">
+        <field name="name">contract.ocr.log.search</field>
+        <field name="model">contract.ocr.log</field>
+        <field name="arch" type="xml">
+            <search string="OCR Protokoll">
+                <field name="contract_id"/>
+                <field name="attachment_id"/>
+                <filter name="ocr_pending" string="Wartet" domain="[('ocr_state','=','pending')]"/>
+                <filter name="ocr_done" string="Erfolgreich" domain="[('ocr_state','=','done')]"/>
+                <filter name="ocr_error" string="Fehler" domain="[('ocr_state','=','error')]"/>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_contract_ocr_log" model="ir.actions.act_window">
+        <field name="name">OCR Protokoll</field>
+        <field name="res_model">contract.ocr.log</field>
+        <field name="view_mode">list</field>
+        <field name="view_id" ref="view_contract_ocr_log_tree"/>
+        <field name="search_view_id" ref="view_contract_ocr_log_search"/>
+    </record>
+</odoo>
