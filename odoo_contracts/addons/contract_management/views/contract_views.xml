@@ -35,6 +35,102 @@
         </field>
     </record>
 
+    <record id="view_contract_contract_kanban" model="ir.ui.view">
+        <field name="name">contract.contract.kanban</field>
+        <field name="model">contract.contract</field>
+        <field name="arch" type="xml">
+            <kanban class="o_kanban_mobile o_kanban_small_column" default_group_by="approval_state">
+                <field name="name"/>
+                <field name="contract_number"/>
+                <field name="partner_id"/>
+                <field name="contract_kind"/>
+                <field name="contract_value"/>
+                <field name="currency_id"/>
+                <field name="end_date"/>
+                <field name="approval_state"/>
+                <field name="expiry_status"/>
+                <field name="requires_manager_approval"/>
+                <field name="responsible_user_id"/>
+                <field name="approval_user_id"/>
+                <templates>
+                    <t t-name="card">
+                        <div class="o_kanban_record">
+                            <div class="o_kanban_record_top">
+                                <div class="o_kanban_record_headings">
+                                    <strong>
+                                        <field name="name"/>
+                                    </strong>
+                                    <div class="text-muted">
+                                        <field name="contract_number"/>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="o_kanban_record_body">
+                                <div>
+                                    <strong>Partner:</strong>
+                                    <field name="partner_id"/>
+                                </div>
+                                <div>
+                                    <strong>Art:</strong>
+                                    <field name="contract_kind"/>
+                                </div>
+                                <div>
+                                    <strong>Wert:</strong>
+                                    <field name="contract_value"/>
+                                </div>
+                                <div>
+                                    <strong>Ende:</strong>
+                                    <field name="end_date"/>
+                                </div>
+                                <div>
+                                    <strong>Ampel:</strong>
+                                    <field name="expiry_status" widget="badge"/>
+                                </div>
+                                <div>
+                                    <strong>Freigeber:</strong>
+                                    <field name="approval_user_id"/>
+                                </div>
+                                <div invisible="not requires_manager_approval">
+                                    <strong>Manager-Freigabe:</strong>
+                                    <field name="requires_manager_approval"/>
+                                </div>
+                            </div>
+                            <div class="o_kanban_record_bottom">
+                                <div class="text-muted">
+                                    <field name="responsible_user_id"/>
+                                </div>
+                            </div>
+                        </div>
+                    </t>
+                </templates>
+            </kanban>
+        </field>
+    </record>
+
+    <record id="view_contract_contract_pivot" model="ir.ui.view">
+        <field name="name">contract.contract.pivot</field>
+        <field name="model">contract.contract</field>
+        <field name="arch" type="xml">
+            <pivot string="Vertragsauswertung">
+                <field name="contract_kind" type="row"/>
+                <field name="payment_interval" type="col"/>
+                <field name="department_id" type="row"/>
+                <field name="contract_value" type="measure"/>
+            </pivot>
+        </field>
+    </record>
+
+    <record id="view_contract_contract_graph" model="ir.ui.view">
+        <field name="name">contract.contract.graph</field>
+        <field name="model">contract.contract</field>
+        <field name="arch" type="xml">
+            <graph string="Vertragsvolumen" type="bar">
+                <field name="contract_kind"/>
+                <field name="contract_value" type="measure"/>
+            </graph>
+        </field>
+    </record>
+
     <record id="view_contract_attachment_tree" model="ir.ui.view">
         <field name="name">contract.attachment.tree</field>
         <field name="model">ir.attachment</field>
@@ -449,12 +545,66 @@
     <record id="action_contract_contract" model="ir.actions.act_window">
         <field name="name">Verträge</field>
         <field name="res_model">contract.contract</field>
-        <field name="view_mode">list,form,calendar</field>
+        <field name="view_mode">kanban,list,form,calendar,pivot,graph</field>
+        <field name="view_id" ref="view_contract_contract_kanban"/>
         <field name="search_view_id" ref="view_contract_contract_search"/>
         <field name="help" type="html">
             <p class="o_view_nocontent_smiling_face">
                 Erstellen Sie Ihren ersten Vertrag
             </p>
+        </field>
+    </record>
+
+    <record id="action_contract_dashboard" model="ir.actions.act_window">
+        <field name="name">Dashboard</field>
+        <field name="res_model">contract.contract</field>
+        <field name="view_mode">kanban,list,pivot,graph,calendar,form</field>
+        <field name="view_id" ref="view_contract_contract_kanban"/>
+        <field name="search_view_id" ref="view_contract_contract_search"/>
+        <field name="context">
+            {
+                'search_default_approval_pending': 1,
+                'search_default_group_contract_kind': 1
+            }
+        </field>
+    </record>
+
+    <record id="action_contract_my_approvals" model="ir.actions.act_window">
+        <field name="name">Meine Freigaben</field>
+        <field name="res_model">contract.contract</field>
+        <field name="view_mode">kanban,list,form</field>
+        <field name="view_id" ref="view_contract_contract_kanban"/>
+        <field name="search_view_id" ref="view_contract_contract_search"/>
+        <field name="context">
+            {
+                'search_default_my_approvals': 1
+            }
+        </field>
+    </record>
+
+    <record id="action_contract_critical" model="ir.actions.act_window">
+        <field name="name">Kritische Verträge</field>
+        <field name="res_model">contract.contract</field>
+        <field name="view_mode">kanban,list,calendar,form</field>
+        <field name="view_id" ref="view_contract_contract_kanban"/>
+        <field name="search_view_id" ref="view_contract_contract_search"/>
+        <field name="context">
+            {
+                'search_default_critical_contracts': 1
+            }
+        </field>
+    </record>
+
+    <record id="action_contract_high_commitments" model="ir.actions.act_window">
+        <field name="name">Hohe Verpflichtungen</field>
+        <field name="res_model">contract.contract</field>
+        <field name="view_mode">list,pivot,graph,form</field>
+        <field name="search_view_id" ref="view_contract_contract_search"/>
+        <field name="context">
+            {
+                'search_default_high_commitments': 1,
+                'search_default_group_cost_center': 1
+            }
         </field>
     </record>
 </odoo>

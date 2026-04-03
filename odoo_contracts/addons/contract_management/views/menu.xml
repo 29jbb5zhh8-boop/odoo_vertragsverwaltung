@@ -1,7 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
-    <menuitem id="menu_contract_root" name="Verträge" sequence="10" action="action_contract_contract"/>
-    <menuitem id="menu_contract_contracts" name="Verträge" parent="menu_contract_root" action="action_contract_contract" sequence="10"/>
+    <menuitem id="menu_contract_root" name="Verträge" sequence="10" action="action_contract_dashboard"/>
+    <menuitem id="menu_contract_dashboard" name="Dashboard" parent="menu_contract_root" action="action_contract_dashboard" sequence="5"/>
+    <menuitem id="menu_contract_my_approvals" name="Meine Freigaben" parent="menu_contract_root" action="action_contract_my_approvals" sequence="10"/>
+    <menuitem id="menu_contract_critical" name="Kritische Verträge" parent="menu_contract_root" action="action_contract_critical" sequence="15"/>
+    <menuitem id="menu_contract_high_commitments" name="Hohe Verpflichtungen" parent="menu_contract_root" action="action_contract_high_commitments" sequence="20"/>
+    <menuitem id="menu_contract_contracts" name="Alle Verträge" parent="menu_contract_root" action="action_contract_contract" sequence="30"/>
     <menuitem id="menu_contract_config" name="Konfiguration" parent="menu_contract_root" sequence="100" groups="contract_management.group_contract_manager"/>
     <menuitem id="menu_contract_types" name="Vertragstypen" parent="menu_contract_config" action="action_contract_type" sequence="10" groups="contract_management.group_contract_manager"/>
     <menuitem id="menu_contract_categories" name="Vertragskategorien" parent="menu_contract_config" action="action_contract_category" sequence="15" groups="contract_management.group_contract_manager"/>
