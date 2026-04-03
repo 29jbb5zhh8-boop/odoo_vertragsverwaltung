@@ -2,7 +2,7 @@ import base64
 
 from odoo import api, fields, models
 from odoo.tools import html2plaintext
-from odoo.exceptions import ValidationError
+from odoo.exceptions import UserError, ValidationError
 from odoo.tools.pdf import merge_pdf
 
 
@@ -37,6 +37,11 @@ class ContractContract(models.Model):
     responsible_user_id = fields.Many2one(
         "res.users",
         string="Verantwortlich",
+        tracking=True,
+    )
+    approval_user_id = fields.Many2one(
+        "res.users",
+        string="Freigeber",
         tracking=True,
     )
     department_id = fields.Many2one(
@@ -89,6 +94,25 @@ class ContractContract(models.Model):
         default="draft",
         tracking=True,
     )
+    approval_state = fields.Selection(
+        [
+            ("draft", "In Bearbeitung"),
+            ("pending", "Zur Freigabe"),
+            ("approved", "Freigegeben"),
+            ("rejected", "Abgelehnt"),
+        ],
+        string="Freigabe",
+        default="draft",
+        tracking=True,
+    )
+    submitted_for_approval_at = fields.Datetime(
+        string="Eingereicht am",
+        readonly=True,
+    )
+    approved_at = fields.Datetime(
+        string="Freigegeben am",
+        readonly=True,
+    )
     note = fields.Html(string="Notizen")
     fulltext = fields.Text(string="Volltext", compute="_compute_fulltext", store=True, index=True)
 
@@ -136,6 +160,8 @@ class ContractContract(models.Model):
             if not vals.get("contract_number"):
                 seq = self.env["ir.sequence"].sudo().next_by_code("contract.contract")
                 vals["contract_number"] = seq or "V-00000"
+            if not vals.get("responsible_user_id"):
+                vals["responsible_user_id"] = self.env.user.id
         return super().create(vals_list)
 
     def name_get(self):
@@ -238,6 +264,9 @@ class ContractContract(models.Model):
 
 
     def action_activate(self):
+        for rec in self:
+            if rec.approval_state != "approved":
+                raise UserError("Der Vertrag muss vor der Aktivierung freigegeben werden.")
         self.write({"state": "active"})
 
     def action_cancel(self):
@@ -247,7 +276,88 @@ class ContractContract(models.Model):
         self.write({"state": "expired"})
 
     def action_reset_draft(self):
-        self.write({"state": "draft"})
+        self.write(
+            {
+                "state": "draft",
+                "approval_state": "draft",
+                "submitted_for_approval_at": False,
+                "approved_at": False,
+            }
+        )
+
+    def _check_can_approve(self):
+        self.ensure_one()
+        if self.env.user.has_group("contract_management.group_contract_manager"):
+            return
+        if self.approval_user_id != self.env.user:
+            raise UserError("Nur der zugewiesene Freigeber oder ein Vertragsmanager darf freigeben.")
+
+    def action_submit_for_approval(self):
+        for rec in self:
+            if rec.approval_state not in ("draft", "rejected"):
+                raise UserError("Nur Entwuerfe oder abgelehnte Vertraege koennen eingereicht werden.")
+            if not rec.approval_user_id:
+                raise UserError("Bitte zuerst einen Freigeber hinterlegen.")
+            rec.write(
+                {
+                    "approval_state": "pending",
+                    "submitted_for_approval_at": fields.Datetime.now(),
+                    "approved_at": False,
+                }
+            )
+            rec.message_post(
+                body=f"Vertrag zur Freigabe eingereicht an {rec.approval_user_id.display_name}."
+            )
+            self.env["contract.timeline"].create(
+                {
+                    "contract_id": rec.id,
+                    "event_type": "status",
+                    "message": f"Zur Freigabe eingereicht an {rec.approval_user_id.display_name}",
+                    "user_id": self.env.user.id,
+                }
+            )
+
+    def action_approve(self):
+        for rec in self:
+            if rec.approval_state != "pending":
+                raise UserError("Nur Vertraege im Status 'Zur Freigabe' koennen freigegeben werden.")
+            rec._check_can_approve()
+            rec.write(
+                {
+                    "approval_state": "approved",
+                    "approved_at": fields.Datetime.now(),
+                }
+            )
+            rec.message_post(body="Vertrag freigegeben.")
+            self.env["contract.timeline"].create(
+                {
+                    "contract_id": rec.id,
+                    "event_type": "status",
+                    "message": "Vertrag freigegeben",
+                    "user_id": self.env.user.id,
+                }
+            )
+
+    def action_reject(self):
+        for rec in self:
+            if rec.approval_state != "pending":
+                raise UserError("Nur Vertraege im Status 'Zur Freigabe' koennen abgelehnt werden.")
+            rec._check_can_approve()
+            rec.write(
+                {
+                    "approval_state": "rejected",
+                    "approved_at": False,
+                }
+            )
+            rec.message_post(body="Vertrag abgelehnt.")
+            self.env["contract.timeline"].create(
+                {
+                    "contract_id": rec.id,
+                    "event_type": "status",
+                    "message": "Vertrag abgelehnt",
+                    "user_id": self.env.user.id,
+                }
+            )
 
 
     def action_open_ocr_viewer(self):
@@ -297,18 +407,32 @@ class ContractContract(models.Model):
 
     def write(self, vals):
         old_states = {}
+        old_approval_states = {}
         old_dates = {}
         old_misc = {}
         to_log = []
         if "state" in vals:
             for rec in self:
                 old_states[rec.id] = rec.state
+        if "approval_state" in vals:
+            for rec in self:
+                old_approval_states[rec.id] = rec.approval_state
         if "start_date" in vals or "end_date" in vals:
             for rec in self:
                 old_dates[rec.id] = (rec.start_date, rec.end_date)
-        if "type_id" in vals or "partner_id" in vals or "responsible_user_id" in vals:
+        if (
+            "type_id" in vals
+            or "partner_id" in vals
+            or "responsible_user_id" in vals
+            or "approval_user_id" in vals
+        ):
             for rec in self:
-                old_misc[rec.id] = (rec.type_id, rec.partner_id, rec.responsible_user_id)
+                old_misc[rec.id] = (
+                    rec.type_id,
+                    rec.partner_id,
+                    rec.responsible_user_id,
+                    rec.approval_user_id,
+                )
         res = super().write(vals)
         if "state" in vals:
             for rec in self:
@@ -319,6 +443,27 @@ class ContractContract(models.Model):
                         body=f"Status geaendert: {dict(self._fields['state'].selection).get(old)} → {dict(self._fields['state'].selection).get(new)}"
                     )
                     to_log.append((rec, "status", f"Status: {dict(self._fields['state'].selection).get(old)} → {dict(self._fields['state'].selection).get(new)}"))
+        if "approval_state" in vals:
+            for rec in self:
+                old = old_approval_states.get(rec.id)
+                new = rec.approval_state
+                if old and old != new:
+                    rec.message_post(
+                        body=(
+                            "Freigabe geaendert: "
+                            f"{dict(self._fields['approval_state'].selection).get(old)} → "
+                            f"{dict(self._fields['approval_state'].selection).get(new)}"
+                        )
+                    )
+                    to_log.append(
+                        (
+                            rec,
+                            "status",
+                            "Freigabe: "
+                            f"{dict(self._fields['approval_state'].selection).get(old)} → "
+                            f"{dict(self._fields['approval_state'].selection).get(new)}",
+                        )
+                    )
         if "start_date" in vals or "end_date" in vals:
             for rec in self:
                 old_start, old_end = old_dates.get(rec.id, (False, False))
@@ -332,9 +477,16 @@ class ContractContract(models.Model):
                         body=f"Enddatum geaendert: {old_end or '-'} → {rec.end_date or '-'}"
                     )
                     to_log.append((rec, "date", f"Enddatum: {old_end or '-'} → {rec.end_date or '-'}"))
-        if "type_id" in vals or "partner_id" in vals or "responsible_user_id" in vals:
+        if (
+            "type_id" in vals
+            or "partner_id" in vals
+            or "responsible_user_id" in vals
+            or "approval_user_id" in vals
+        ):
             for rec in self:
-                old_type, old_partner, old_resp = old_misc.get(rec.id, (False, False, False))
+                old_type, old_partner, old_resp, old_approver = old_misc.get(
+                    rec.id, (False, False, False, False)
+                )
                 if old_type != rec.type_id:
                     rec.message_post(
                         body=f"Vertragstyp geaendert: {old_type.display_name if old_type else '-'} → {rec.type_id.display_name if rec.type_id else '-'}"
@@ -346,6 +498,10 @@ class ContractContract(models.Model):
                 if old_resp != rec.responsible_user_id:
                     rec.message_post(
                         body=f"Verantwortlich geaendert: {old_resp.display_name if old_resp else '-'} → {rec.responsible_user_id.display_name if rec.responsible_user_id else '-'}"
+                    )
+                if old_approver != rec.approval_user_id:
+                    rec.message_post(
+                        body=f"Freigeber geaendert: {old_approver.display_name if old_approver else '-'} → {rec.approval_user_id.display_name if rec.approval_user_id else '-'}"
                     )
         for rec, etype, msg in to_log:
             self.env["contract.timeline"].create(
@@ -473,6 +629,7 @@ class ContractContract(models.Model):
         to_activate = self.search(
             [
                 ("state", "=", "draft"),
+                ("approval_state", "=", "approved"),
                 ("start_date", "!=", False),
                 ("start_date", "<=", today),
             ]

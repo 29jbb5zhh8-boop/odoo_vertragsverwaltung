@@ -1,6 +1,6 @@
 id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
-access_contract_contract_base_user,access_contract_contract_base_user,model_contract_contract,base.group_user,1,0,0,0
 access_contract_contract_user,access_contract_contract_user,model_contract_contract,contract_management.group_contract_user,1,0,0,0
+access_contract_contract_approver,access_contract_contract_approver,model_contract_contract,contract_management.group_contract_approver,1,1,0,0
 access_contract_contract_manager,access_contract_contract_manager,model_contract_contract,contract_management.group_contract_manager,1,1,1,1
 access_contract_contract_admin,access_contract_contract_admin,model_contract_contract,base.group_system,1,1,1,1
 

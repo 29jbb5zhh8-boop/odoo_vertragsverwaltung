@@ -12,6 +12,8 @@
                 <field name="type_id" optional="show"/>
                 <field name="category_id" optional="show"/>
                 <field name="responsible_user_id" optional="show"/>
+                <field name="approval_user_id" optional="show"/>
+                <field name="approval_state" widget="badge" optional="show"/>
                 <field name="department_id" optional="show"/>
                 <field name="start_date" optional="show" widget="date" options="{'datepicker': {'format': 'DD.MM.YYYY'}}"/>
                 <field name="end_date" optional="show" widget="date" options="{'datepicker': {'format': 'DD.MM.YYYY'}}"/>
@@ -74,7 +76,10 @@
         <field name="arch" type="xml">
             <form string="Vertrag">
                 <header>
-                    <button name="action_activate" type="object" string="Aktivieren" class="btn-primary" invisible="state != 'draft'"/>
+                    <button name="action_submit_for_approval" type="object" string="Zur Freigabe einreichen" class="btn-secondary" invisible="approval_state not in ['draft', 'rejected']"/>
+                    <button name="action_approve" type="object" string="Freigeben" class="btn-primary" groups="contract_management.group_contract_approver,contract_management.group_contract_manager" invisible="approval_state != 'pending'"/>
+                    <button name="action_reject" type="object" string="Ablehnen" class="btn-secondary" groups="contract_management.group_contract_approver,contract_management.group_contract_manager" invisible="approval_state != 'pending'"/>
+                    <button name="action_activate" type="object" string="Aktivieren" class="btn-primary" invisible="state != 'draft' or approval_state != 'approved'"/>
                     <button name="action_set_expired" type="object" string="Als abgelaufen markieren" invisible="state not in ['active', 'expiring']"/>
                     <button name="%(contract_management.action_contract_cancel_wizard)d" type="action" string="Kündigen" class="btn-secondary" invisible="state in ['cancelled']" context="{'default_contract_id': id}"/>
                     <button name="action_reset_draft" type="object" string="Auf Entwurf setzen" invisible="state not in ['cancelled', 'expired']"/>
@@ -83,6 +88,7 @@
                     <button name="action_toggle_chatter" type="object" string="Chatter ausblenden" class="btn-secondary" invisible="show_chatter == False"/>
                     <button name="action_toggle_chatter" type="object" string="Chatter einblenden" class="btn-secondary" invisible="show_chatter == True"/>
                     <field name="state" widget="statusbar" statusbar_visible="draft,active,expiring,expired,cancelled"/>
+                    <field name="approval_state" widget="statusbar" statusbar_visible="draft,pending,approved,rejected"/>
                 </header>
                 <sheet>
                     <group col="2">
@@ -90,10 +96,23 @@
                             <field name="contract_number" readonly="1" style="color: var(--o-main-text-color);"/>
                             <field name="name"/>
                             <field name="state"/>
+                            <field name="approval_state" readonly="1"/>
                         </group>
                         <group>
                             <field name="partner_id"/>
                             <field name="responsible_user_id"/>
+                            <field name="approval_user_id"/>
+                        </group>
+                    </group>
+
+                    <separator string="Freigabe"/>
+                    <group col="2">
+                        <group>
+                            <field name="submitted_for_approval_at" readonly="1"/>
+                            <field name="approved_at" readonly="1"/>
+                        </group>
+                        <group>
+                            <field name="approval_user_id" readonly="1"/>
                         </group>
                     </group>
 
@@ -205,6 +224,8 @@
                 <field name="type_id"/>
                 <field name="category_id"/>
                 <field name="responsible_user_id"/>
+                <field name="approval_user_id"/>
+                <field name="approval_state"/>
                 <field name="department_id"/>
                 <field name="start_date"/>
                 <field name="end_date"/>
@@ -216,6 +237,9 @@
                 <field name="expiry_status"/>
                 <field name="fulltext" string="Volltext"/>
                 <field name="state"/>
+                <filter name="approval_pending" string="Zur Freigabe" domain="[('approval_state', '=', 'pending')]"/>
+                <filter name="approval_approved" string="Freigegeben" domain="[('approval_state', '=', 'approved')]"/>
+                <filter name="my_approvals" string="Meine Freigaben" domain="[('approval_user_id', '=', uid), ('approval_state', '=', 'pending')]"/>
                 <filter name="expiring_30" string="Läuft in 30 Tagen" domain="[('end_date','!=',False), ('end_date','&lt;=', (context_today() + relativedelta(days=30)).strftime('%%Y-%%m-%%d')), ('end_date','&gt;=', context_today().strftime('%%Y-%%m-%%d'))]"/>
                 <filter name="expiring_60" string="Läuft in 60 Tagen" domain="[('end_date','!=',False), ('end_date','&lt;=', (context_today() + relativedelta(days=60)).strftime('%%Y-%%m-%%d')), ('end_date','&gt;=', context_today().strftime('%%Y-%%m-%%d'))]"/>
                 <filter name="expiring_90" string="Läuft in 90 Tagen" domain="[('end_date','!=',False), ('end_date','&lt;=', (context_today() + relativedelta(days=90)).strftime('%%Y-%%m-%%d')), ('end_date','&gt;=', context_today().strftime('%%Y-%%m-%%d'))]"/>
